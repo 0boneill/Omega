@@ -24,6 +24,8 @@
 #include "MachEnv.h"
 #include "mpi.h"
 
+#include <numeric>
+
 namespace OMEGA {
 
 // Set the default MPI real data type as single or double precision based on
@@ -46,6 +48,16 @@ enum MeshElement { OnCell, OnEdge, OnVertex };
 /// here for easy accesibility by the Halo methods.
 class Halo {
  private:
+
+   /// The default Halo handles halo exchanges for arrays defined on the mesh
+   /// with the default decomposition. A pointer is stored here for easy 
+   /// retrieval.
+   static Halo *DefaultHalo;
+
+   /// All halos are tracked/stored within the class as a map paired with a
+   /// name for later retrieval.
+   static std::map<std::string, Halo> AllHalos;
+
    const Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
 
    I4 NNghbr;          /// number of neighboring tasks
@@ -56,6 +68,10 @@ class Halo {
    MPI_Comm MyComm;    /// MPI communicator handle
    MeshElement MyElem; /// index space of current array
 
+   /// Bools to track which neighbors which neighbors the task needs to
+   /// send elements to and receive elements from for each index space.
+   std::vector<I4> SendBools[3], RecvBools[3];
+
    /// Forward Declaration of Neighbor class, defined below
    class Neighbor;
 
@@ -64,8 +80,10 @@ class Halo {
    /// exchange in any index space.
    std::vector<Neighbor> Neighbors;
 
-   /// List of Task IDs of all neighboring tasks in the order they appear
-   /// in the Neighbors vector above
+   /// Sorted list of Task IDs of all neighboring tasks in ascending order. A
+   /// task is considered a neighbor if a mesh element owned by another task is
+   /// in the halo of the local task in at least one index space, or if an owned
+   /// element is in the halo of another task in at least one index space.
    std::vector<I4> NeighborList;
 
    /// Pointer to current neighbor, utilized in the various member functions
@@ -144,6 +162,17 @@ class Halo {
 
    // Private methods
 
+   int generateNeighborList(const I4 NOwned,
+                            const I4 NAll,
+                            HostArray1DI4 NHalo,
+                            HostArray2DI4 Locs,
+                            std::vector<I4> &ListOfNeighbors);
+
+   int setNeighborBools(std::vector<I4> NeighborElem,
+                         const MeshElement IdxSpace);
+
+   int determineNeighbors(const I4 NumTasks);
+
    /// Send a vector of integers to each neighboring task and receive a vector
    /// of integers from each neighboring task. The first dimension of each
    /// input 2D vector represents the task in the order they appear in
@@ -162,6 +191,11 @@ class Halo {
    generateExchangeLists(std::vector<std::vector<std::vector<I4>>> &SendLists,
                          std::vector<std::vector<std::vector<I4>>> &RecvLists,
                          const MeshElement IndexSpace);
+   int
+   generateExchangeListsOr(std::vector<std::vector<std::vector<I4>>> &SendLists,
+                         std::vector<std::vector<std::vector<I4>>> &RecvLists,
+                         const MeshElement IndexSpace);
+
 
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor
    int startReceives();
@@ -222,8 +256,30 @@ class Halo {
  public:
    // Methods
 
-   // Construct a new halo for the input MachEnv and Decomp
+   /// initialize default Halo
+   static int init();
+
+   /// Construct a new halo for the input MachEnv and Decomp
+   Halo(const std::string &Name, const MachEnv *InEnv, const Decomp *InDecomp);
+
+   /// Construct a new halo for the input MachEnv and Decomp
    Halo(const MachEnv *InEnv, const Decomp *InDecomp);
+
+   /// Destructor
+   ~Halo();
+
+   /// Erase - removes Halo by name
+   static void erase(std::string InName ///< [in] name of Halo to remove
+   );
+
+   /// Clear - removes all defined Halo instances
+   static void clear();
+
+   /// Retrieves a pointer to the default Halo object.
+   static Halo *getDefault();
+
+   /// Retrieve a pointer to a Halo object by name
+   static Halo *get(std::string name);
 
    //---------------------------------------------------------------------------
    // Function template to perform a full halo exchange on the input Kokkos
@@ -273,10 +329,12 @@ class Halo {
       // Loop through each Neighbor and pack the buffers to be sent
       // to each neighboring task
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         MyNeighbor = &Neighbors[INghbr];
-         packBuffer(Array);
-         MyNeighbor->Received = false;
-         MyNeighbor->Unpacked = false;
+         if (SendBools[MyElem][INghbr]) {
+            MyNeighbor = &Neighbors[INghbr];
+            packBuffer(Array);
+            MyNeighbor->Received = false;
+            MyNeighbor->Unpacked = false;
+         }
       }
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
@@ -284,33 +342,40 @@ class Halo {
 
       // Wait for all sends to complete before proceeding
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         MyNeighbor = &Neighbors[INghbr];
-         MPI_Wait(&MyNeighbor->SReq, MPI_STATUS_IGNORE);
+         if (SendBools[MyElem][INghbr]) {
+            MyNeighbor = &Neighbors[INghbr];
+            MPI_Wait(&MyNeighbor->SReq, MPI_STATUS_IGNORE);
+         }
       }
 
       I4 MaxIter = 100000000; // Large integer to prevent infinite loop
       I4 IPass   = 0;         // Number of passes through while loop
       I4 NRcvd   = 0;         // Number of messages received
 
+      I4 NMessages = std::accumulate(RecvBools[MyElem].begin(),
+                                     RecvBools[MyElem].end(), 0);
+
       // Until all messages from neighboring tasks are received, loop
       // through Neighbor objects and use MPI_Test to check if the message
       // has been received
       while (not AllReceived) {
          for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-            MyNeighbor = &Neighbors[INghbr];
-            if (not MyNeighbor->Received) {
-               MPI_Test(&MyNeighbor->RReq, &MyNeighbor->Received,
-                        MPI_STATUS_IGNORE);
-               if (MyNeighbor->Received) {
-                  NRcvd++;
+            if (RecvBools[MyElem][INghbr]) {
+               MyNeighbor = &Neighbors[INghbr];
+               if (not MyNeighbor->Received) {
+                  MPI_Test(&MyNeighbor->RReq, &MyNeighbor->Received,
+                           MPI_STATUS_IGNORE);
+                  if (MyNeighbor->Received) {
+                     NRcvd++;
+                  }
+               }
+               if (MyNeighbor->Received and not MyNeighbor->Unpacked) {
+                  unpackBuffer(Array);
+                  MyNeighbor->Unpacked = true;
                }
             }
-            if (MyNeighbor->Received and not MyNeighbor->Unpacked) {
-               unpackBuffer(Array);
-               MyNeighbor->Unpacked = true;
-            }
          }
-         if (NRcvd == NNghbr) {
+         if (NRcvd == NMessages) {
             AllReceived = true;
          }
          ++IPass;

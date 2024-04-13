@@ -36,7 +36,7 @@
 
 template <typename T>
 void haloExchangeTest(
-    OMEGA::Halo MyHalo,
+    OMEGA::Halo *MyHalo,
     T InitArray,  /// Array initialized based on global IDs of mesh elements
     T &TestArray, /// Array only initialized in owned elements
     const char *Label,                          /// Unique label for test
@@ -55,7 +55,7 @@ void haloExchangeTest(
    }
 
    // Perform halo exchange
-   IErr = MyHalo.exchangeFullArrayHalo(TestArray, ThisElem);
+   IErr = MyHalo->exchangeFullArrayHalo(TestArray, ThisElem);
    if (IErr != 0) {
       LOG_ERROR("HaloTest: Error during {} halo exchange", Label);
       TotErr += -1;
@@ -63,8 +63,6 @@ void haloExchangeTest(
    }
 
    // Collapse arrays to 1D for easy iteration
-   // auto CollapsedInit = InitArray.collapse();
-   // auto CollapsedTest = TestArray.collapse();
    Kokkos::View<typename T::value_type *, typename T::array_layout,
                 typename T::memory_space>
        CollapsedInit(InitArray.data(), InitArray.size());
@@ -129,11 +127,12 @@ int main(int argc, char *argv[]) {
       if (IErr != 0)
          LOG_ERROR("DecompTest: error initializing default decomposition");
 
+      OMEGA::Halo::init();
+
+      OMEGA::Halo *MyHalo = OMEGA::Halo::getDefault();
+
       // Retrieve the default decomposition
       OMEGA::Decomp *DefDecomp = OMEGA::Decomp::getDefault();
-
-      // Create the halo exchange object for the given MachEnv and Decomp
-      OMEGA::Halo MyHalo(DefEnv, DefDecomp);
 
       OMEGA::I4 NumOwned;
       OMEGA::I4 NumAll;
