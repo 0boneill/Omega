@@ -27,7 +27,7 @@ namespace OMEGA {
 Halo *Halo::DefaultHalo = nullptr;
 std::map<std::string, Halo> Halo::AllHalos;
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Local routine that searches a std::vector<I4> for a particular entry and
 // returns the index of that entry. If not found, the size is returned
 // (corresponding to the last index + 1)
@@ -45,7 +45,7 @@ I4 searchVector(const std::vector<I4> &InVector, // vector to search
 
 } // end function searchVector (std::vector)
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Construct a new ExchList based on input 2D vector which contains a list
 // of indices sorted by halo layer
 
@@ -82,7 +82,7 @@ Halo::ExchList::ExchList(
 // Empty constructor for ExchList class
 Halo::ExchList::ExchList() = default;
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Construct a new Neighbor given the send and receive lists for each index
 // space of the neighboring task identified by NghbrID
 
@@ -110,7 +110,7 @@ Halo::Neighbor::Neighbor(
 
 } // end Neighbor constructor
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Initialize and construct the default Halo. MachEnv and Decomp must already
 // be initialized
 int Halo::init() {
@@ -128,9 +128,8 @@ int Halo::init() {
 
 } // End Halo init
 
-// -----------------------------------------------------------------------------
-// Construct a Halo for the input MachEnv and Decomp.
-
+//------------------------------------------------------------------------------
+// Construct a Halo for the input Name, MachEnv, and Decomp.
 
 Halo::Halo(const std::string &Name,
            const MachEnv *InEnv,
@@ -161,6 +160,7 @@ Halo::Halo(const std::string &Name,
    std::vector<std::vector<std::vector<I4>>> RecvVrtxLists;
    std::vector<std::vector<std::vector<I4>>> SendVrtxLists;
 
+   // Determine which tasks are neighbors to the local task
    determineNeighbors(NumTasks);
 
    // Generate the exchange lists for each neighboring task in each index space
@@ -187,60 +187,8 @@ Halo::Halo(const std::string &Name,
 
 } // end Halo constructor
 
-// -----------------------------------------------------------------------------
-// Construct a Halo for the input MachEnv and Decomp.
-
-Halo::Halo(const MachEnv *InEnv, const Decomp *InDecomp) {
-
-   I4 IErr{0}; // error code
-
-   // Set pointer for the Decomp
-   MyDecomp = InDecomp;
-
-   // Set member variable for the halo width
-   HaloWidth = MyDecomp->HaloWidth;
-
-   // Set local task ID and the MPI communicator
-   MyTask = InEnv->getMyTask();
-   MyComm = InEnv->getComm();
-
-   // Fetch the total number of tasks
-   I4 NumTasks = InEnv->getNumTasks();
-
-   // Declare 3D vectors to hold lists of indices generated below which are
-   // used to construct a Neighbor for each neighboring task
-   std::vector<std::vector<std::vector<I4>>> RecvCellLists;
-   std::vector<std::vector<std::vector<I4>>> SendCellLists;
-   std::vector<std::vector<std::vector<I4>>> RecvEdgeLists;
-   std::vector<std::vector<std::vector<I4>>> SendEdgeLists;
-   std::vector<std::vector<std::vector<I4>>> RecvVrtxLists;
-   std::vector<std::vector<std::vector<I4>>> SendVrtxLists;
-
-   determineNeighbors(NumTasks);
-
-   // Generate the exchange lists for each neighboring task in each index space
-   IErr = generateExchangeLists(SendCellLists, RecvCellLists, OnCell);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Cells");
-   IErr = generateExchangeLists(SendEdgeLists, RecvEdgeLists, OnEdge);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Edges");
-   IErr = generateExchangeLists(SendVrtxLists, RecvVrtxLists, OnVertex);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Vertices");
-
-   // Construct the Neighbor objects and save them in class member Neighbors
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      Neighbors.push_back(Neighbor(SendCellLists[INghbr], SendEdgeLists[INghbr],
-                                   SendVrtxLists[INghbr], RecvCellLists[INghbr],
-                                   RecvEdgeLists[INghbr], RecvVrtxLists[INghbr],
-                                   NeighborList[INghbr]));
-   }
-
-} // end Halo constructor
-
 // Destructor
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Destroy instance of Halo
 
 Halo::~Halo() {
@@ -248,6 +196,9 @@ Halo::~Halo() {
    // No operations necessary
 
 } // end destructor
+
+//------------------------------------------------------------------------------
+// Removes a Halo from AllHalos map and destroys it
 
 void Halo::erase(std::string InName // name of Halo to remove
 ) {
@@ -257,6 +208,9 @@ void Halo::erase(std::string InName // name of Halo to remove
 
 } // end Halo erase
 
+//------------------------------------------------------------------------------
+// Removes all Halos and destroys them
+
 void Halo::clear() {
 
    AllHalos.clear(); // removes all Halos from the map and in the
@@ -264,10 +218,15 @@ void Halo::clear() {
 
 } // end Halo clear
 
-// Get default Halo 
+// Retrieval functions
+//------------------------------------------------------------------------------
+// Get default Halo
+
 Halo *Halo::getDefault() { return Halo::DefaultHalo; }
 
+//------------------------------------------------------------------------------
 // Get Halo by name
+
 Halo *Halo::get(const std::string Name // name of Halo to retrieve
 ) {
 
@@ -285,7 +244,7 @@ Halo *Halo::get(const std::string Name // name of Halo to retrieve
    }
 } // end Halo get
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 //
 
 int Halo::determineNeighbors(const I4 NumTasks
@@ -317,44 +276,13 @@ int Halo::determineNeighbors(const I4 NumTasks
    std::set_union(NeighborCells.begin(), NeighborCells.end(), NeighborEdges.begin(), NeighborEdges.end(), std::back_inserter(UofCE));
    std::set_union(UofCE.begin(), UofCE.end(), NeighborVertices.begin(), NeighborVertices.end(), std::back_inserter(UofCEV));
 
-//   NNghbr = NeighborList.size();
-
-//   std::cout << MyTask << " | " << NeighborList.size() << " :  ";
-//   for(int i = 0; i < NeighborList.size(); i++){
-//      std::cout << NeighborList[i] << " ";
-//   }
-//   std::cout << std::endl;
-
-//   NeighborInHalo[0].resize(NNghbr);
-//
-//   for (int Idx = 0; Idx < NNghbr; ++Idx) {
-//      auto It = std::find(NeighborCells.begin(), NeighborCells.end(), NeighborList[Idx]);
-//      if (It != NeighborCells.end()) {
-//         NeighborInHalo[0][Idx] = true;
-//      } else {
-//         NeighborInHalo[0][Idx] = false;
-//      }
-//   }
-
    std::vector<I4> SendAll(NumTasks, 0);
    std::vector<I4> RecvAll(NumTasks, 0);
    for (int INghbr = 0; INghbr < UofCEV.size(); ++INghbr) {
       SendAll[UofCEV[INghbr]] = 1;
    }
 
-//   std::cout << MyTask << " | " << NNghbr << " :  ";
-//   for(int i = 0; i < NumTasks; i++){
-//      std::cout << SendAll[i] << " ";
-//   }
-//   std::cout << std::endl;
-
    I4 MPIErr = MPI_Alltoall(&SendAll[0], 1, MPI_INT, &RecvAll[0], 1, MPI_INT, MyComm);
-
-//   std::cout << MyTask << " | " << NNghbr << " :  ";
-//   for(int i = 0; i < NumTasks; i++){
-//      std::cout << RecvAll[i] << " ";
-//   }
-//   std::cout << std::endl;
 
    std::vector<I4> AddNeighbors;
    for (int ITask = 0; ITask < NumTasks; ++ITask) {
@@ -365,26 +293,14 @@ int Halo::determineNeighbors(const I4 NumTasks
    std::set_union(UofCEV.begin(), UofCEV.end(), AddNeighbors.begin(), AddNeighbors.end(), std::back_inserter(NeighborList));
    NNghbr = NeighborList.size();
 
-//   std::cout << MyTask << " | " << NNghbr << " :  ";
-//   for(int i = 0; i < NNghbr; i++){
-//      std::cout << NeighborList[i] << " ";
-//   }
-//   std::cout << std::endl;
-
    setNeighborBools(NeighborCells, OnCell);
    setNeighborBools(NeighborEdges, OnEdge);
    setNeighborBools(NeighborVertices, OnVertex);
 
-//   std::cout << MyTask << " logicals : ";
-//   for (int i = 0; i < NNghbr; ++i) {
-//      std::cout << NeighborInHalo[2][i] << " ";
-//   }
-//   std::cout << std::endl;
-
    return Err;
 }
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 //
 
 int Halo::generateNeighborList(
@@ -407,14 +323,11 @@ int Halo::generateNeighborList(
 
    std::sort(ListOfNeighbors.begin(), ListOfNeighbors.end());
 
-//   std::cout << MyTask << " | " << ListOfNeighbors.size() << " :  ";
-//   for(int i = 0; i < ListOfNeighbors.size(); i++){
-//      std::cout << ListOfNeighbors[i] << " ";
-//   }
-//   std::cout << std::endl;
-
    return Err;
 }
+
+//------------------------------------------------------------------------------
+//
 
 int Halo::setNeighborBools(
    std::vector<I4> NeighborElem,
@@ -422,11 +335,6 @@ int Halo::setNeighborBools(
 ) {
 
    I4 Err{0};
-
-//   FILE *fp;
-//   char outname[16];
-//   sprintf(outname, "out_%d.txt", MyTask);
-//   fp = fopen(outname, "w");
 
    SendBools[IdxSpace].resize(NNghbr);
    RecvBools[IdxSpace].resize(NNghbr);
@@ -439,10 +347,6 @@ int Halo::setNeighborBools(
          RecvBools[IdxSpace][INghbr] = 0;
       }
    }
-
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      fprintf(fp, "%4d %4d\n", NeighborList[INghbr], static_cast<I4>(NeighborInHalo[IdxSpace][INghbr]));
-//   }
 
    I4 SendErr{0};
    I4 RecvErr{0};
@@ -468,13 +372,18 @@ int Halo::setNeighborBools(
       }
    }
 
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      fprintf(fp, "%4d %4d\n", NeighborList[INghbr], OwnedInNeighbor[IdxSpace][INghbr]);
-//   }
-
-//   fclose(fp);
    return Err;
 }
+
+//------------------------------------------------------------------------------
+//
+//////// Generate the lists of indices that are used to construct the ExchList
+//////// objects of the input index space for each Neighbor, and save the lists in
+//////// the input 3D vectors SendLists and RecvLists. The first dimension of these
+//////// vectors represent the task in the order they appear in NeighborList, and the
+//////// remaining 2D vector is passed to the Neighbor constructor for that
+//////// neighboring task.
+
 
 int Halo::generateExchangeLists(
     std::vector<std::vector<std::vector<I4>>> &SendLists,
@@ -482,11 +391,6 @@ int Halo::generateExchangeLists(
     const MeshElement IndexSpace) {
 
    I4 IErr{0}; // error code
-
-//   FILE *fp;
-//   char outname[16];
-//   sprintf(outname, "out_%d.txt", MyTask);
-//   fp = fopen(outname, "w");
 
    // Pointers to the needed info from the Decomp for the input index space
    const I4 *NOwnedPtr{nullptr};
@@ -543,228 +447,6 @@ int Halo::generateExchangeLists(
       }
    }
 
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//         fprintf(fp,"%8d", NumNghbrHalo[INghbr][ILayer]);
-//      }
-//      fprintf(fp,"\n");
-//   }
-
-   // Allocate vectors to save halo index info extracted from Decomp now that
-   // the number of halo elements owned by each neighboring task is known.
-   std::vector<std::vector<I4>> HaloIdx;
-
-   RecvLists.resize(NNghbr);
-   HaloIdx.resize(NNghbr);
-
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      HaloIdx[INghbr].resize(NumLayers);
-      RecvLists[INghbr].resize(NumLayers);
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         RecvLists[INghbr][ILayer].resize(NumNghbrHalo[INghbr][ILayer]);
-      }
-      I4 TotHalo = std::accumulate(NumNghbrHalo[INghbr].begin(),
-                                   NumNghbrHalo[INghbr].end(), 0);
-      HaloIdx[INghbr].resize(TotHalo);
-   }
-
-   // Save the needed halo info from Decomp in RecvLists and HaloIdx. RecvLists
-   // will contain the local indices of halo elements that are owned by
-   // neighbors, sorted by neighbor and halo layer, these are then ready to
-   // construct the ExchList objects for each Neighbor for this index space.
-   // HaloIdx will collect lists of indices for the same mesh elements as
-   // defined on the neighboring tasks that own them, this array is collapsed
-   // along the halo layer dimension to facilitate MPI communication since each
-   // of these lists need to be sent to the corresponding neighboring task.
-   std::vector<I4> IOffsets(NNghbr, 0);
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      std::vector<I4> ListIdx(NNghbr, 0);
-      for (int Idx = HaloBnds[ILayer]; Idx < HaloBnds[ILayer + 1]; ++Idx) {
-         I4 INghbr = searchVector(NeighborList, LocPtr(Idx, 0));
-         I4 IList  = ListIdx[INghbr]++;
-         RecvLists[INghbr][ILayer][IList]          = Idx;
-         HaloIdx[INghbr][IOffsets[INghbr] + IList] = LocPtr(Idx, 1);
-      }
-      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         IOffsets[INghbr] += NumNghbrHalo[INghbr][ILayer];
-      }
-   }
-
-   // Allocate a vector of vectors for each neighbor that will receive the
-   // number of locally owned elements that belong to each layer of the halos
-   // of neighboring tasks.
-   std::vector<std::vector<I4>> NumLocalHalo(NNghbr,
-                                             std::vector<I4>(NumLayers, 0));
-
-   // Exchange halo sizes with neighboring tasks.
-   IErr = exchangeVectorInt(NumNghbrHalo, NumLocalHalo);
-
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//         fprintf(fp,"%8d", NumLocalHalo[INghbr][ILayer]);
-//      }
-//      fprintf(fp,"\n");
-//   }
-
-   // Now that the number of locally owned elements that belong to the halos
-   // of neighboring tasks is known, allocate space to receive this info.
-   std::vector<std::vector<I4>> OwnedIdx;
-
-   OwnedIdx.resize(NNghbr);
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      I4 TotHalo = std::accumulate(NumLocalHalo[INghbr].begin(),
-                                   NumLocalHalo[INghbr].end(), 0);
-      OwnedIdx[INghbr].resize(TotHalo);
-   }
-
-   // Send indices of elements needed by the local halo and receive
-   // the indices of elements locally owned that are needed by the
-   // halos of neighboring tasks.
-   IErr = exchangeVectorInt(HaloIdx, OwnedIdx);
-
-   // Sort out the received lists of indices by halo layer and save
-   // in SendLists, these are now ready to construct the ExchList
-   // objects for each Neighbor for this index space.
-   SendLists.resize(NNghbr);
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      SendLists[INghbr].resize(NumLayers);
-      I4 IOffset = 0;
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         SendLists[INghbr][ILayer].resize(NumLocalHalo[INghbr][ILayer]);
-         for (int IList = 0; IList < NumLocalHalo[INghbr][ILayer]; ++IList) {
-            SendLists[INghbr][ILayer][IList] =
-                OwnedIdx[INghbr][IOffset + IList];
-         }
-         IOffset += NumLocalHalo[INghbr][ILayer];
-      }
-   }
-
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      fprintf(fp, "%4d ID: %8d\n---------\n", INghbr, NeighborList[INghbr]);
-//      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//         fprintf(fp, "Layer %4d: %8d\n---------\n", ILayer, NumLocalHalo[INghbr][ILayer]);
-//         for (int IList = 0; IList < NumLocalHalo[INghbr][ILayer]; ++IList) {
-//            fprintf(fp, "%8d\n", SendLists[INghbr][ILayer][IList]);
-//         }
-//         fprintf(fp, "---------\n");
-//      }
-//   }
-
-//   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-//      fprintf(fp, "%4d ID: %8d\n---------\n", INghbr, NeighborList[INghbr]);
-//      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//         fprintf(fp, "Layer %4d: %8d\n---------\n", ILayer, NumNghbrHalo[INghbr][ILayer]);
-//         for (int IList = 0; IList < NumNghbrHalo[INghbr][ILayer]; ++IList) {
-//            fprintf(fp, "%8d\n", RecvLists[INghbr][ILayer][IList]);
-//         }
-//         fprintf(fp, "---------\n");
-//      }
-//   }
-
-//   fclose(fp);
-
-   return IErr;
-} // end generateExchangeLists
-
-// -----------------------------------------------------------------------------
-// Generate the lists of indices that are used to construct the ExchList
-// objects of the input index space for each Neighbor, and save the lists in
-// the input 3D vectors SendLists and RecvLists. The first dimension of these
-// vectors represent the task in the order they appear in NeighborList, and the
-// remaining 2D vector is passed to the Neighbor constructor for that
-// neighboring task.
-
-int Halo::generateExchangeListsOr(
-    std::vector<std::vector<std::vector<I4>>> &SendLists,
-    std::vector<std::vector<std::vector<I4>>> &RecvLists,
-    const MeshElement IndexSpace) {
-
-   I4 IErr{0}; // error code
-
-   // Pointers to the needed info from the Decomp for the input index space
-   const I4 *NOwnedPtr{nullptr};
-   const I4 *NAllPtr{nullptr};
-   HostArray1DI4 NHaloPtr;
-   HostArray2DI4 LocPtr;
-
-   // Logical flag to check if this is the first time the function is called
-   bool First{false};
-
-   // Fetch the proper info for this index space
-   switch (IndexSpace) {
-   case OnCell:
-      NOwnedPtr = &MyDecomp->NCellsOwned;
-      NAllPtr   = &MyDecomp->NCellsAll;
-      NHaloPtr  = MyDecomp->NCellsHaloH;
-      LocPtr    = MyDecomp->CellLocH;
-      NumLayers = HaloWidth;
-      First     = true;
-
-      break;
-   case OnEdge:
-      NOwnedPtr = &MyDecomp->NEdgesOwned;
-      NAllPtr   = &MyDecomp->NEdgesAll;
-      NHaloPtr  = MyDecomp->NEdgesHaloH;
-      LocPtr    = MyDecomp->EdgeLocH;
-      NumLayers = HaloWidth + 1;
-
-      break;
-   case OnVertex:
-      NOwnedPtr = &MyDecomp->NVerticesOwned;
-      NAllPtr   = &MyDecomp->NVerticesAll;
-      NHaloPtr  = MyDecomp->NVerticesHaloH;
-      LocPtr    = MyDecomp->VertexLocH;
-      NumLayers = HaloWidth + 1;
-
-      break;
-   }
-
-   // Save the indices that define the bounds of each halo layer
-   std::vector<I4> HaloBnds{*NOwnedPtr};
-   for (int ILayer = 0; ILayer < HaloWidth; ++ILayer) {
-      HaloBnds.push_back(NHaloPtr(ILayer));
-   }
-   if (IndexSpace != OnCell)
-      HaloBnds.push_back(*NAllPtr);
-
-   // Determine the number of halo elements owned by each neighbor in each halo
-   // layer. If this is the first time the function is called, also determine
-   // the neighboring task IDs, save them in NeighborList, and save the number
-   // of neighboring tasks in NNghbr.
-   std::vector<std::vector<I4>> NumNghbrHalo;
-
-   if (First) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int Idx = HaloBnds[ILayer]; Idx < HaloBnds[ILayer + 1]; ++Idx) {
-            I4 NewVal = LocPtr(Idx, 0);
-            auto it =
-                std::find(NeighborList.begin(), NeighborList.end(), NewVal);
-            if (it == NeighborList.end()) {
-               std::vector<I4> TmpVec(NumLayers, 0);
-               ++TmpVec[ILayer];
-               NeighborList.push_back(NewVal);
-               NumNghbrHalo.push_back(TmpVec);
-            } else {
-               I4 INghbr = std::distance(NeighborList.begin(), it);
-               ++NumNghbrHalo[INghbr][ILayer];
-            }
-         }
-      }
-      NNghbr = NeighborList.size();
-   } else {
-      std::vector<I4> TmpVec(NumLayers, 0);
-      for (int INghbr = 0; INghbr < NNghbr; ++INghbr)
-         NumNghbrHalo.push_back(TmpVec);
-
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int Idx = HaloBnds[ILayer]; Idx < HaloBnds[ILayer + 1]; ++Idx) {
-            I4 NewVal = LocPtr(Idx, 0);
-            I4 INghbr = searchVector(NeighborList, NewVal);
-            ++NumNghbrHalo[INghbr][ILayer];
-         }
-      }
-   }
-
    // Allocate vectors to save halo index info extracted from Decomp now that
    // the number of halo elements owned by each neighboring task is known.
    std::vector<std::vector<I4>> HaloIdx;
@@ -850,7 +532,7 @@ int Halo::generateExchangeListsOr(
    return IErr;
 } // end generateExchangeLists
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Exchange 1D integer vectors with each neighbor. Takes as input two 2D
 // vectors, SendVec and RecvVec, where the first dimension is the neighboring
 // task to send to or receive from, and the second dimension is the 1D vector
@@ -895,36 +577,12 @@ int Halo::exchangeVectorInt(
       }
    }
 
-/*
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      I4 DimLen       = SendVec[INghbr].size();
-      SendErr[INghbr] = MPI_Send(&SendVec[INghbr][0], DimLen, MPI_INT,
-                                 NeighborList[INghbr], 0, MyComm);
-      if (SendErr[INghbr] != 0) {
-         LOG_ERROR("MPI error {} on task {} send to task {}", SendErr[INghbr],
-                   MyTask, NeighborList[INghbr]);
-         Err = -1;
-      }
-   }
-
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      I4 DimLen = RecvVec[INghbr].size();
-      RecvErr[INghbr] =
-          MPI_Recv(&RecvVec[INghbr][0], DimLen, MPI_INT, NeighborList[INghbr],
-                   0, MyComm, MPI_STATUS_IGNORE);
-      if (RecvErr[INghbr] != 0) {
-         LOG_ERROR("MPI error {} on task {} receive from task {}",
-                   RecvErr[INghbr], MyTask, NeighborList[INghbr]);
-         Err = -1;
-      }
-   }
-*/
    MPI_Waitall(NNghbr, RecvReqs.data(), MPI_STATUS_IGNORE);
 
    return Err;
 } // end exchangeVectorInt
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Allocate RecvBuffer and prepare for MPI communication by calling MPI_Irecv
 // for each Neighbor
 
@@ -954,7 +612,7 @@ int Halo::startReceives() {
    return Err;
 } // end startReceives
 
-// -----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Initiate MPI communication by calling MPI_Isend for each Neighbor to send
 // the packed buffers to each task
 
