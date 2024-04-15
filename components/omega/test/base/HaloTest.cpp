@@ -93,6 +93,39 @@ void haloExchangeTest(
 } // end haloExchangeTest
 
 //------------------------------------------------------------------------------
+// Initialization routine for Halo tests. Calls all the init routines needed
+// to create the default Halo.
+
+int initHaloTest() {
+
+   OMEGA::I4 IErr{0};
+ 
+   // Initialize the machine environment and fetch the default environment
+   // pointer and the MPI communicator
+   OMEGA::MachEnv::init(MPI_COMM_WORLD);
+   OMEGA::MachEnv *DefEnv = OMEGA::MachEnv::getDefaultEnv();
+   MPI_Comm DefComm       = DefEnv->getComm();
+
+   // Initialize the IO system
+   IErr = OMEGA::IO::init(DefComm);
+   if (IErr != 0)
+      LOG_ERROR("HaloTest: error initializing parallel IO");
+
+   // Create the default decomposition (initializes the decomposition)
+   IErr = OMEGA::Decomp::init();
+   if (IErr != 0)
+      LOG_ERROR("HaloTest: error initializing default decomposition");
+
+   // Initialize the default halo
+   IErr = OMEGA::Halo::init();
+   if (IErr != 0)
+      LOG_ERROR("HaloTest: error initializing default halo");
+
+   return IErr;
+
+} // end initHaloTest
+
+//------------------------------------------------------------------------------
 // The test driver. Performs halo exchange tests of all index spaces and all
 // supported Kokkos array types. For each test, an initial array is set based on
 // Global IDs of the mesh elements in the given index space for all owned and
@@ -112,27 +145,10 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize();
    {
 
-      // Initialize the machine environment and fetch the default environment
-      // pointer, the MPI communicator and the task ID of the local task
-      OMEGA::MachEnv::init(MPI_COMM_WORLD);
-      OMEGA::MachEnv *DefEnv = OMEGA::MachEnv::getDefaultEnv();
-      MPI_Comm DefComm       = DefEnv->getComm();
-      OMEGA::I4 MyTask       = DefEnv->getMyTask();
-
-      // Initialize the IO system
-      IErr = OMEGA::IO::init(DefComm);
+      // Call Halo test initialization routine
+      IErr = initHaloTest();
       if (IErr != 0)
-         LOG_ERROR("HaloTest: error initializing parallel IO");
-
-      // Create the default decomposition (initializes the decomposition)
-      IErr = OMEGA::Decomp::init();
-      if (IErr != 0)
-         LOG_ERROR("HaloTest: error initializing default decomposition");
-
-      // Initialize the default halo
-      IErr = OMEGA::Halo::init();
-      if (IErr != 0)
-         LOG_ERROR("HaloTest: error initializing default halo");
+         LOG_ERROR("HaloTest: initHaloTest error");
 
       // Retrieve pointer to default halo
       OMEGA::Halo *DefHalo = OMEGA::Halo::getDefault();
