@@ -99,7 +99,7 @@ void haloExchangeTest(
 int initHaloTest() {
 
    OMEGA::I4 IErr{0};
- 
+
    // Initialize the machine environment and fetch the default environment
    // pointer and the MPI communicator
    OMEGA::MachEnv::init(MPI_COMM_WORLD);
@@ -173,7 +173,8 @@ int main(int argc, char *argv[]) {
          Test1DI4Cell(ICell) = -1;
       }
 
-      haloExchangeTest(DefHalo, Init1DI4Cell, Test1DI4Cell, "1DI4 Cell", TotErr);
+      haloExchangeTest(DefHalo, Init1DI4Cell, Test1DI4Cell, "1DI4 Cell",
+                       TotErr);
 
       OMEGA::HostArray1DI4 Init1DI4Edge("Init1DI4Edge", DefDecomp->NEdgesSize);
       OMEGA::HostArray1DI4 Test1DI4Edge("Test1DI4Edge", DefDecomp->NEdgesSize);

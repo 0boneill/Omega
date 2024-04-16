@@ -23,10 +23,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "mpi.h"
-
 #include <numeric>
-#include <stdio.h>
-#include <iostream>
 
 namespace OMEGA {
 
@@ -50,9 +47,8 @@ enum MeshElement { OnCell, OnEdge, OnVertex };
 /// here for easy accesibility by the Halo methods.
 class Halo {
  private:
-
    /// The default Halo handles halo exchanges for arrays defined on the mesh
-   /// with the default decomposition. A pointer is stored here for easy 
+   /// with the default decomposition. A pointer is stored here for easy
    /// retrieval.
    static Halo *DefaultHalo;
 
@@ -165,16 +161,18 @@ class Halo {
    // Private methods
 
    ///
-   int generateListOfTasksInHalo(const I4 NOwned,
-                                 const I4 NAll,
+   int generateListOfTasksInHalo(const I4 NOwned, const I4 NAll,
                                  HostArray2DI4 Locs,
                                  std::vector<I4> &ListOfNeighbors);
 
-   ///
+   /// Set SendFlags and RecvFlags for the input index space. Utilized only
+   /// during halo construction
    int setNeighborFlags(std::vector<I4> NeighborElem,
                         const MeshElement IdxSpace);
 
-   ///
+   /// Uses info from Decomp to determine all tasks which own elements in the
+   /// halo of the local task or need locally owned elements for their halo.
+   /// Utilized only during halo construction
    int determineNeighbors(const I4 NumTasks);
 
    /// Send a vector of integers to each neighboring task and receive a vector
@@ -184,13 +182,13 @@ class Halo {
    int exchangeVectorInt(const std::vector<std::vector<I4>> &SendVec,
                          std::vector<std::vector<I4>> &RecvVec);
 
-   ////// Generate the lists of indices to send to and receive from each
-   ////// neighboring task for the input IndexSpace and the Decomp pointed to
-   ////// by member variable MyDecomp, and save the lists in the input 3D
-   ////// vectors SendLists and RecvLists. The first dimension of these vectors
-   ////// represent the task in the order they appear in NeighborList, and the
-   ////// remaining 2D vector is used in constructing a Neighbor object for
-   ////// that task. Utilized only during halo construction
+   /// Generate the lists of indices to send to and receive from each
+   /// neighboring task for the input IndexSpace and the Decomp pointed to
+   /// by member variable MyDecomp, and save the lists in the input 3D
+   /// vectors SendLists and RecvLists. The first dimension of these vectors
+   /// represent the task in the order they appear in NeighborList, and the
+   /// remaining 2D vector is used in constructing a Neighbor object for
+   /// that task. Utilized only during halo construction
    int
    generateExchangeLists(std::vector<std::vector<std::vector<I4>>> &SendLists,
                          std::vector<std::vector<std::vector<I4>>> &RecvLists,
@@ -328,7 +326,7 @@ class Halo {
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         MyNeighbor = &Neighbors[INghbr];
+         MyNeighbor           = &Neighbors[INghbr];
          MyNeighbor->Received = false;
          MyNeighbor->Unpacked = false;
          if (SendFlags[MyElem][INghbr]) {
