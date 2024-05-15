@@ -184,6 +184,28 @@ add_omega_test(
 )
 
 ##################
+# State test
+##################
+
+add_omega_test(
+    STATE_TEST
+    testState.exe
+    ocn/StateTest.cpp
+    "-n 8;--cpu-bind=cores"
+)
+
+##################
+# Tend test
+##################
+
+add_omega_test(
+    TEND_TEST
+    testTend.exe
+    ocn/TendTest.cpp
+    ""
+)
+
+##################
 # Time Manager test
 ##################
 
@@ -225,5 +247,6 @@ set_tests_properties(
   TIMEMGR_TEST
   KOKKOS_TEST
   IOFIELD_TEST
+  STATE_TEST
   PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL" PASS_REGULAR_EXPRESSION "PASS"
 )
