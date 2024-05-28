@@ -64,7 +64,31 @@ TracerHorzAdvOnCell::TracerHorzAdvOnCell(
       CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell) {
 
-    Options->get("TracerHAdvTendency", Enabled);
+    Options->get("TracerHAdvTendencyEnable", Enabled);
+
+}
+
+TracerDiffusionOnCell::TracerDiffusionOnCell(
+    const HorzMesh *Mesh, Config *Options)
+    : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
+      CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
+      DvEdge(Mesh->DvEdge), DcEdge(Mesh->DcEdge), AreaCell(Mesh->AreaCell) {
+//      MeshScalingDel2(Mesh->MeshScalingDel2) {
+
+    Options->get("TracerDiffTendencyEnable", Enabled);
+    Options->get("EddyDiff2", EddyDiff2);
+
+}
+
+TracerHyperDiffusionOnCell::TracerHyperDiffusionOnCell(
+    const HorzMesh *Mesh, Config *Options)
+    : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
+      CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
+      DvEdge(Mesh->DvEdge), DcEdge(Mesh->DcEdge), AreaCell(Mesh->AreaCell) {
+//      MeshScalingDel4(Mesh->MeshScalingDel2) {
+
+    Options->get("TracerHyperDiffTendencyEnable", Enabled);
+    Options->get("EddyDiff4", EddyDiff4);
 
 }
 
