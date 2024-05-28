@@ -8,12 +8,12 @@
 
 namespace OMEGA {
 
-class ThicknessFluxDivergenceOnCell {
+class ThickFluxDivOnC {
  public:
  
    bool Enabled = false;
  
-   ThicknessFluxDivergenceOnCell(const HorzMesh *Mesh, Config *Options);
+   ThickFluxDivOnC(const HorzMesh *Mesh, Config *Options);
   
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 ICell,
@@ -41,12 +41,12 @@ class ThicknessFluxDivergenceOnCell {
 
 };
 
-class PotentialVortFluxOnEdge {
+class PotVortFluxOnE {
  public:
 
    bool Enabled = false;
 
-   PotentialVortFluxOnEdge(const HorzMesh *Mesh, Config *Options);
+   PotVortFluxOnE(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
@@ -78,12 +78,12 @@ class PotentialVortFluxOnEdge {
 
 };
 
-class KineticEnergyGradOnEdge {
+class KEGradOnE {
  public:
 
    bool Enabled = false;
 
-   KineticEnergyGradOnEdge(const HorzMesh *Mesh, Config *Options);
+   KEGradOnE(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
@@ -139,12 +139,12 @@ class SSHGradOnEdge {
 
 };
 
-class VelocityDiffusionOnEdge {
+class VelDiffOnE {
  public:
 
    bool Enabled = false;
 
-   VelocityDiffusionOnEdge(const HorzMesh *Mesh, Config *Options);
+   VelDiffOnE(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
@@ -185,12 +185,12 @@ class VelocityDiffusionOnEdge {
 
 };
 
-class VelocityHyperDiffusionOnEdge {
+class VelHyperDiffOnE {
  public: 
 
    bool Enabled = false;
 
-   VelocityHyperDiffusionOnEdge(const HorzMesh *Mesh, Config *Options);
+   VelHyperDiffOnE(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
@@ -233,11 +233,11 @@ class VelocityHyperDiffusionOnEdge {
 
 };
 
-class TracerHorzAdvOnCell {
+class TracerHAdvOnC {
  public:
    bool Enabled = false;
 
-   TracerHorzAdvOnCell(const HorzMesh *Mesh, Config *Options);
+   TracerHAdvOnC(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array3DReal &Tend,
                                    I4 L,
@@ -275,11 +275,11 @@ class TracerHorzAdvOnCell {
 
 };
 
-class TracerDiffusionOnCell {
+class TracerDiffOnC {
  public:
    bool Enabled = false;
 
-   TracerDiffusionOnCell(const HorzMesh *Mesh, Config *Options);
+   TracerDiffOnC(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array3DReal &Tend,
                                    I4 L,
@@ -326,11 +326,11 @@ class TracerDiffusionOnCell {
 
 };
 
-class TracerHyperDiffusionOnCell {
+class TracerHyperDiffOnC {
  public:
    bool Enabled = false;
 
-   TracerHyperDiffusionOnCell(const HorzMesh *Mesh, Config *Options);
+   TracerHyperDiffOnC(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(Array3DReal &Tend,
                                    I4 L,
