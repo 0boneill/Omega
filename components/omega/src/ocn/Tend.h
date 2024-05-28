@@ -18,12 +18,8 @@ class ThicknessFluxDivergenceOnCell {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 ICell,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array2DR8 &ThicknessFlux
                                   ) const {
-      // dummy vars 
-      Array2DR8 ThicknessFlux;
-      
 
       const Real InvAreaCell = 1. / AreaCell(ICell);
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -31,7 +27,6 @@ class ThicknessFluxDivergenceOnCell {
          for (int K = KChunk * VecLength; K < (KChunk + 1) * VecLength; ++K) {
             Tend(ICell, K) -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                  ThicknessFlux(JEdge, K) * InvAreaCell;
-    // AuxState->ThicknessFlux(JEdge, K) * InvAreaCell;
          }
       }
 
@@ -56,14 +51,11 @@ class PotentialVortFluxOnEdge {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                  const OceaAuxState *AuxState
+                                   const Array2DR8 &NormRVortEdge,
+                                   const Array2DR8 &NormFEdge,
+                                   const Array2DR8 &HFluxEdge,
+                                   const Array2DR8 &VNEdge
                                    ) const {
-      // dummy vars
-      Array2DR8 NormRVortEdge;
-      Array2DR8 NormFEdge;
-      Array2DR8 HFluxEdge;
-      Array2DR8 VNEdge;
 
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
       
@@ -96,11 +88,8 @@ class KineticEnergyGradOnEdge {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
-                                   const OceanState *State  
-//                                  const OceaAuxState *AuxState
+                                   const Array2DR8 &KECell
                                    ) const {
-      // dummy vars
-      Array2DR8 KECell;
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -130,13 +119,9 @@ class SSHGradOnEdge {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array2DR8 &HCell
                                    ) const {
-      // dummy vars
-      Array2DR8 HCell;
       
-
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1. / DcEdge(IEdge);
@@ -164,12 +149,9 @@ class VelocityDiffusionOnEdge {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array2DR8 &DivCell,
+                                   const Array2DR8 &RVortVertex
                                    ) const {
-      // dummy vars
-      Array2DR8 DivCell;
-      Array2DR8 RVortVertex;
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -213,12 +195,9 @@ class VelocityHyperDiffusionOnEdge {
    KOKKOS_FUNCTION void operator()(Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array2DR8 &Del2DivCell,
+                                   const Array2DR8 &Del2RVortVertex
                                    ) const {
-      // dummy vars
-      Array2DR8 Del2DivCell;
-      Array2DR8 Del2RVortVertex;
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -240,9 +219,6 @@ class VelocityHyperDiffusionOnEdge {
                           Del2U;
 
       }
-
-
-
 
    }
 
@@ -267,13 +243,10 @@ class TracerHorzAdvOnCell {
                                    I4 L,
                                    I4 ICell,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array2DR8 &VEdge,
+                                   const Array3DR8 &NormTrCell,
+                                   const Array2DR8 &HFluxEdge
                                    ) const {
-      // dummy vars
-      Array2DR8 VEdge;
-      Array3DR8 NormTrCell;
-      Array2DR8 HFluxEdge;
 
       Real InvAreaCell = 1. / AreaCell(ICell);
 
@@ -312,13 +285,10 @@ class TracerDiffusionOnCell {
                                    I4 L,
                                    I4 ICell,
                                    I4 KChunk,
-                                   const OceanState *State
+                                   const Array3DR8 &NormTrCell,
+                                   const Array2DR8 &HMeanEdge
 //                                   const OceanAuxState *AuxState
                                    ) const {
-
-      // dummy vars
-      Array3DR8 NormTrCell;
-      Array2DR8 HMeanEdge;
 
       Real InvAreaCell = 1. / AreaCell(ICell);
 
@@ -366,13 +336,8 @@ class TracerHyperDiffusionOnCell {
                                    I4 L,
                                    I4 ICell,
                                    I4 KChunk,
-                                   const OceanState *State
-//                                   const OceanAuxState *AuxState
+                                   const Array3DR8 &TrDel2Cell
                                    ) const {
-
-
-      // dummy vars
-      Array3DR8 TrDel2Cell;
 
       Real InvAreaCell = 1. / AreaCell(ICell);
 
