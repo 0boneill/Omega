@@ -5,7 +5,7 @@
 
 namespace OMEGA {
 
-ThickFluxDivOnC::ThickFluxDivOnC(
+ThicknessFluxDivOnCell::ThicknessFluxDivOnCell(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),
@@ -14,7 +14,7 @@ ThickFluxDivOnC::ThickFluxDivOnC(
     Options->get("ThicknessFluxTendencyEnable", Enabled);
 }
 
-PotVortFluxOnE::PotVortFluxOnE(
+PotentialVortFluxOnEdge::PotentialVortFluxOnEdge(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnEdge(Mesh->NEdgesOnEdge), EdgesOnEdge(Mesh->EdgesOnEdge),
       WeightsOnEdge(Mesh->WeightsOnEdge) {
@@ -23,7 +23,7 @@ PotVortFluxOnE::PotVortFluxOnE(
 
 }
 
-KEGradOnE::KEGradOnE(
+KEGradOnEdge::KEGradOnEdge(
     const HorzMesh *Mesh, Config *Options)
     : CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge) {
 
@@ -37,7 +37,7 @@ SSHGradOnEdge::SSHGradOnEdge(const HorzMesh *Mesh, Config *Options)
     Options->get("Gravity", Grav);
 }
 
-VelDiffOnE::VelDiffOnE(
+VelocityDiffusionOnEdge::VelocityDiffusionOnEdge(
     const HorzMesh *Mesh, Config *Options)
     : CellsOnEdge(Mesh->CellsOnEdge), VerticesOnEdge(Mesh->VerticesOnEdge),
       DcEdge(Mesh->DcEdge), DvEdge(Mesh->DvEdge) { //,
@@ -48,7 +48,7 @@ VelDiffOnE::VelDiffOnE(
 
 }
 
-VelHyperDiffOnE::VelHyperDiffOnE(
+VelocityHyperDiffonEdge::VelocityHyperDiffonEdge(
     const HorzMesh *Mesh, Config *Options)
     : CellsOnEdge(Mesh->CellsOnEdge), VerticesOnEdge(Mesh->VerticesOnEdge),
       DcEdge(Mesh->DcEdge), DvEdge(Mesh->DvEdge) { //,
@@ -58,7 +58,7 @@ VelHyperDiffOnE::VelHyperDiffOnE(
     Options->get("ViscDel4", ViscDel4);
 }
 
-TracerHAdvOnC::TracerHAdvOnC(
+TracerHorzAdvOnCell::TracerHorzAdvOnCell(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
@@ -68,7 +68,7 @@ TracerHAdvOnC::TracerHAdvOnC(
 
 }
 
-TracerDiffOnC::TracerDiffOnC(
+TracerDiffOnCell::TracerDiffOnCell(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
@@ -80,7 +80,7 @@ TracerDiffOnC::TracerDiffOnC(
 
 }
 
-TracerHyperDiffOnC::TracerHyperDiffOnC(
+TracerHyperDiffOnCell::TracerHyperDiffOnCell(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
