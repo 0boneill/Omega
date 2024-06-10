@@ -11,6 +11,8 @@
 #include "mpi.h"
 
 #include <cmath>
+#include <iomanip>
+#include <iostream>
 
 using namespace OMEGA;
 
@@ -202,6 +204,10 @@ int testDivergence(Real RTol) {
    Err += computeErrors(DivErrors, NumDivCell, ExactDivCell, Mesh, OnCell,
                         NVertLevels);
 
+   std::cout << std::setprecision(15);
+   std::cout << "DivErrors:  ";
+   std::cout << DivErrors.L2 << " " << DivErrors.LInf << std::endl;
+
    // Check error values
    if (!isApprox(DivErrors.LInf, Setup.ExpectedDivErrorLInf, RTol)) {
       Err++;
@@ -221,6 +227,17 @@ int testDivergence(Real RTol) {
 }
 
 int testGradient(Real RTol) {
+
+//   FILE *ofptr1, *ofptr2;
+//   char outname[24];
+//
+//   const auto *DefEnv = MachEnv::getDefaultEnv();
+//   I4 MyTask = DefEnv->getMyTask();
+//   sprintf(outname, "grout_%d.txt", MyTask);
+//   ofptr1 = fopen(outname, "w");
+//   sprintf(outname, "inout_%d.txt", MyTask);
+//   ofptr2 = fopen(outname, "w");
+
    int Err = 0;
    TestSetup Setup;
 
@@ -235,6 +252,15 @@ int testGradient(Real RTol) {
        },
        ScalarCell, Geom, Mesh, OnCell, NVertLevels);
 
+//   auto ScalarH = createHostMirrorCopy(ScalarCell);
+//   for(int ICell = 0; ICell < Mesh->NCellsSize; ++ICell) {
+//      for(int K = 0; K < NVertLevels; ++K) {
+//         fprintf(ofptr2, "%8d     %24.15e", ICell, ScalarH(ICell, K));
+//      }
+//      fprintf(ofptr2, "\n");
+//   }
+//   fclose(ofptr2);
+
    // Compute exact result
    Array2DReal ExactGradEdge("ExactGradEdge", Mesh->NEdgesOwned, NVertLevels);
    Err += setVectorEdge(
@@ -243,6 +269,16 @@ int testGradient(Real RTol) {
           VecField[1] = Setup.exactGradScalarY(X, Y);
        },
        ExactGradEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels, false);
+
+//   auto ExactGradH = createHostMirrorCopy(ExactGradEdge);
+//   for(int IEdge = 0; IEdge < Mesh->NEdgesOwned; ++IEdge) {
+//      for(int K = 0; K < NVertLevels; ++K) {
+//         fprintf(ofptr1, "%8d     %24.15e", IEdge, ExactGradH(IEdge, 0));
+//      }
+//      fprintf(ofptr1, "\n");
+//   }
+//   fclose(ofptr1);
+
 
    // Compute numerical result
    GradientOnEdge GradientEdge(Mesh);
@@ -256,6 +292,11 @@ int testGradient(Real RTol) {
    ErrorMeasures GradErrors;
    Err += computeErrors(GradErrors, NumGradEdge, ExactGradEdge, Mesh, OnEdge,
                         NVertLevels);
+
+   std::cout << std::setprecision(15);
+   std::cout << "GradErrors:  ";
+   std::cout << GradErrors.L2 << " " << GradErrors.LInf << std::endl;
+
 
    // Check error values
    if (!isApprox(GradErrors.LInf, Setup.ExpectedGradErrorLInf, RTol)) {
@@ -310,6 +351,11 @@ int testCurl(Real RTol) {
    ErrorMeasures CurlErrors;
    Err += computeErrors(CurlErrors, NumCurlVertex, ExactCurlVertex, Mesh,
                         OnVertex, NVertLevels);
+
+   std::cout << std::setprecision(15);
+   std::cout << "CurlErrors:  ";
+   std::cout << CurlErrors.L2 << " " << CurlErrors.LInf << std::endl;
+
 
    // Check error values
    if (!isApprox(CurlErrors.LInf, Setup.ExpectedCurlErrorLInf, RTol)) {
