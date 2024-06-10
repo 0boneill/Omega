@@ -199,11 +199,29 @@ add_omega_test(
 ##################
 
 add_omega_test(
-    TEND_TEST
-    testTend.exe
+    TEND_PLANE_TEST
+    testTendPlane.exe
     ocn/TendTest.cpp
-    ""
+    "-n 8;--cpu-bind=cores"
 )
+target_compile_definitions(
+  testTendPlane.exe
+  PRIVATE
+  TEND_TEST_PLANE
+)
+
+add_omega_test(
+  TEND_SPHERE_TEST
+    testTendSphere.exe
+    ocn/TendTest.cpp
+    "-n 8;--cpu-bind=cores"
+)
+target_compile_definitions(
+  testTendSphere.exe
+  PRIVATE
+  TEND_TEST_SPHERE
+)
+
 
 ##################
 # Time Manager test
