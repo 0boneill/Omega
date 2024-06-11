@@ -50,20 +50,20 @@ class ThicknessFluxDivOnCell {
 
 };
 
-class PotentialVortFluxOnEdge {
+class PotentialVortHAdvOnEdge {
  public:
 
    bool Enabled = false;
 
-   PotentialVortFluxOnEdge(const HorzMesh *Mesh, Config *Options);
+   PotentialVortHAdvOnEdge(const HorzMesh *Mesh, Config *Options);
 
    KOKKOS_FUNCTION void operator()(const Array2DReal &Tend,
                                    I4 IEdge,
                                    I4 KChunk,
                                    const Array2DR8 &NormRVortEdge,
                                    const Array2DR8 &NormFEdge,
-                                   const Array2DR8 &HFluxEdge,
-                                   const Array2DR8 &VNEdge
+                                   const Array2DR8 &LayerThickEdge,
+                                   const Array2DR8 &NormVelEdge
                                    ) const {
 
       const I4 KStart         = KChunk * VecLength;
@@ -76,8 +76,8 @@ class PotentialVortFluxOnEdge {
             Real NormVort = (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
                              NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) * 0.5;
 
-            VortTmp[KVec] += WeightsOnEdge(IEdge, J) * HFluxEdge(JEdge, K) *
-                             VNEdge(JEdge, K) * NormVort;
+            VortTmp[KVec] += WeightsOnEdge(IEdge, J) * LayerThickEdge(JEdge, K) *
+                             NormVelEdge(JEdge, K) * NormVort;
 
          }
       }

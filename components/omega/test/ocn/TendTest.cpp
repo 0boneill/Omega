@@ -73,27 +73,23 @@ struct TestSetupPlane {
 
    KOKKOS_FUNCTION Real layerThick(Real X, Real Y) const {
       return 2. + std::sin(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      //return 1.;
    }
 
    KOKKOS_FUNCTION Real planetaryVort(Real X, Real Y) const {
       return std::cos(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      //return 0.;
    }
 
    KOKKOS_FUNCTION Real normRelVort(Real X, Real Y) const {
       return curl(X, Y) / layerThick(X, Y);
+      //return 1.;
    }
 
    KOKKOS_FUNCTION Real normPlanetVort(Real X, Real Y) const {
       return planetaryVort(X, Y) / layerThick(X, Y);
    }
 
-   KOKKOS_FUNCTION Real thickFluxX(Real X, Real Y) const {
-      return layerThick(X, Y) * vectorX(X, Y);
-   }
-
-   KOKKOS_FUNCTION Real thickFluxY(Real X, Real Y) const {
-      return layerThick(X, Y) * vectorY(X, Y);
-   }
 /*
    KOKKOS_FUNCTION Real layerThickness(Real X, Real Y) const {
       return 2 + std::cos(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
@@ -157,16 +153,45 @@ struct TestSetupSphere {
              std::sin(Lat);
    }
 
+//   KOKKOS_FUNCTION Real laplaceVecX(Real Lon, Real Lat) const {
+//      return 2 * std::cos(Lat) * (10 * std::pow(std::sin(Lat), 2) *
+//             (std::pow(std::cos(Lon), 2) - std::pow(std::sin(Lon), 2)) -
+//             6 * std::pow(std::cos(Lat), 2) * std::pow(std::cos(Lon), 2) +
+//             2 * std::pow(std::sin(Lon), 2) + 1) / Radius;
+//   }
+
    KOKKOS_FUNCTION Real laplaceVecX(Real Lon, Real Lat) const {
-      return 2 * std::cos(Lat) * (10 * std::pow(std::sin(Lat), 2) *
-             (std::pow(std::cos(Lon), 2) - std::pow(std::sin(Lon), 2)) -
-             6 * std::pow(std::cos(Lat), 2) * std::pow(std::cos(Lon), 2) +
-             2 * std::pow(std::sin(Lon), 2) + 1) / Radius;
+      return std::cos(Lat) * (8 * std::pow(std::sin(Lon), 2) - 2 +
+             std::pow(std::sin(Lat), 2) * ( 13 * std::pow(std::sin(Lon), 2) -
+             8)) / Radius;
    }
 
+//   KOKKOS_FUNCTION Real laplaceVecY(Real Lon, Real Lat) const {
+//      return 4 * std::sin(Lon) * std::cos(Lon) * std::sin(Lat) *
+//            std::cos(Lon) * (20 * std::pow(std::cos(Lat), 2) - 9) / Radius;
+//   }
+
+
    KOKKOS_FUNCTION Real laplaceVecY(Real Lon, Real Lat) const {
-      return 4 * std::sin(Lon) * std::cos(Lon) * std::sin(Lat) *
-            std::cos(Lon) * (20 * std::pow(std::cos(Lat), 2) - 9) / Radius;
+      return std::sin(Lon) * std::cos(Lon) * std::sin(Lat) * std::cos(Lat) *
+             (52 * std::pow(std::sin(Lat), 2) -
+             28 * std::pow(std::cos(Lat), 2) + 8) / Radius;
+   }
+
+   KOKKOS_FUNCTION Real layerThick(Real Lon, Real Lat) const {
+      return (2 + std::cos(Lon) * std::pow(std::cos(Lat), 4));
+   }
+
+   KOKKOS_FUNCTION Real planetaryVort(Real Lon, Real Lat) const {
+      return std::sin(Lat);;
+   }
+
+   KOKKOS_FUNCTION Real normRelVort(Real Lon, Real Lat) const {
+      return curl(Lon, Lat) / layerThick(Lon, Lat);
+   }
+
+   KOKKOS_FUNCTION Real normPlanetVort(Real Lon, Real Lat) const {
+      return planetaryVort(Lon, Lat) / layerThick(Lon, Lat);
    }
 
 }; // end TestSetupSphere
@@ -180,59 +205,6 @@ constexpr Geometry Geom          = Geometry::Spherical;
 constexpr char DefaultMeshFile[] = "OmegaSphereMesh.nc";
 using TestSetup                  = TestSetupSphere;
 #endif
-
-/*
-int initState(const Array2DReal &LayerThickCell,
-              const Array2DReal &NormalVelEdge, HorzMesh *Mesh,
-              int NVertLevels) {
-   int Err = 0;
-
-   TestSetup Setup;
-
-   Err += setScalar(
-       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
-       LayerThickCell, Geom, Mesh, OnCell, NVertLevels);
-
-   Err += setVectorEdge(
-       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
-          VecField[0] = Setup.velocityX(X, Y);
-          VecField[1] = Setup.velocityY(X, Y);
-       },
-       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels);
-
-
-   // need to override FVertex with prescribed values
-   // cannot use setScalar because it doesn't support setting 1D arrays
-   const auto &FVertex = Mesh->FVertex;
-
-   auto XVertex = createDeviceMirrorCopy(Mesh->XVertexH);
-   auto YVertex = createDeviceMirrorCopy(Mesh->YVertexH);
-
-   auto LonVertex = createDeviceMirrorCopy(Mesh->LonVertexH);
-   auto LatVertex = createDeviceMirrorCopy(Mesh->LatVertexH);
-
-   parallelFor(
-       {Mesh->NVerticesOwned}, KOKKOS_LAMBDA(int IVertex) {
-          if (Geom == Geometry::Planar) {
-             const Real XV    = XVertex(IVertex);
-             const Real YV    = YVertex(IVertex);
-             FVertex(IVertex) = Setup.planetaryVorticity(XV, YV);
-          } else {
-             const Real XV    = LonVertex(IVertex);
-             const Real YV    = LatVertex(IVertex);
-             FVertex(IVertex) = Setup.planetaryVorticity(XV, YV);
-          }
-       });
-
-   auto MyHalo    = Halo::getDefault();
-   auto &FVertexH = Mesh->FVertexH;
-   Err += MyHalo->exchangeFullArrayHalo(FVertexH, OnVertex);
-   deepCopy(FVertex, FVertexH);
-
-
-   return Err;
-}
-*/
 
 int testThickFluxDiv(int NVertLevels, Real RTol) {
 
@@ -297,7 +269,7 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
    return Err;
 } // end testThickFluxDiv
 
-int testPotVortFlux(int NVertLevels, Real RTol) {
+int testPotVortHAdv(int NVertLevels, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
@@ -305,19 +277,27 @@ int testPotVortFlux(int NVertLevels, Real RTol) {
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
    Config *TendConfig;
-/*
+
+//   FILE *ofptr1, *ofptr2, *ofptr3;
+//   char outname[24];
+//
+//   const auto *DefEnv = MachEnv::getDefaultEnv();
+//   I4 MyTask = DefEnv->getMyTask();
+//   sprintf(outname, "vels_%d.txt", MyTask);
+//   ofptr1 = fopen(outname, "w");
+
    // Compute exact result
-   Array2DReal ExactPotVortFlux("ExactPotVortFlux", Mesh->NEdgesOwned,
+   Array2DReal ExactPotVortHAdv("ExactPotVortHAdv", Mesh->NEdgesOwned,
                                 NVertLevels);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = (Setup.normRelVort(X, Y) + Setup.normPlanetVort(X, Y)) *
-                        Setup.thickFluxX(X, Y);
+                        Setup.layerThick(X, Y) * Setup.vectorX(X, Y);
           VecField[1] = (Setup.normRelVort(X, Y) + Setup.normPlanetVort(X, Y)) *
-                        Setup.thickFluxY(X, Y);
+                        Setup.layerThick(X, Y) * Setup.vectorY(X, Y);;
        },
-       ExactPotVortFlux, EdgeComponent::Normal, Geom, Mesh, NVertLevels, false);
+       ExactPotVortHAdv, EdgeComponent::Tangential, Geom, Mesh, NVertLevels, false);
 
    // Set input arrays
    Array2DR8 NormRelVortEdge("NormRelVortEdge", Mesh->NEdgesSize, NVertLevels);
@@ -332,16 +312,22 @@ int testPotVortFlux(int NVertLevels, Real RTol) {
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.normPlanetVort(X,Y); },
        NormPlanetVortEdge, Geom, Mesh, OnEdge, NVertLevels);
 
-   Array2DR8 ThickFluxEdge("ThickFluxEdge", Mesh->NEdgesSize, NVertLevels);
+//   Array2DR8 ThickFluxEdge("ThickFluxEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DR8 LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLevels);
 
-   Err += setVectorEdge(
-       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
-          VecField[0] = Setup.thickFluxX(X, Y);
-          VecField[1] = Setup.thickFluxY(X, Y);
-       },
-       ThickFluxEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels);
+//   Err += setVectorEdge(
+//       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
+//          VecField[0] = Setup.thickFluxX(X, Y);
+//          VecField[1] = Setup.thickFluxY(X, Y);
+//       },
+//       ThickFluxEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels);
+
+   Err += setScalar(
+       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThick(X,Y); },
+       LayerThickEdge, Geom, Mesh, OnEdge, NVertLevels);
 
    Array2DR8 NormVelEdge("NormVelEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DR8 PerpVelEdge("PerpVelEdge", Mesh->NEdgesSize, NVertLevels);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -350,28 +336,47 @@ int testPotVortFlux(int NVertLevels, Real RTol) {
        },
        NormVelEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels);
 
-   // Compute numerical result
-   Array2DReal NumPotVortFlux("NumPotVortFlux", Mesh->NEdgesOwned, NVertLevels);
+   Err += setVectorEdge(
+       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
+          VecField[0] = Setup.vectorX(X, Y);
+          VecField[1] = Setup.vectorY(X, Y);
+       },
+       PerpVelEdge, EdgeComponent::Tangential, Geom, Mesh, NVertLevels);
 
-   PotentialVortFluxOnEdge PotVortFluxOnE(Mesh, TendConfig);
+   // Compute numerical result
+   Array2DReal NumPotVortHAdv("NumPotVortHAdv", Mesh->NEdgesOwned, NVertLevels);
+
+   PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, TendConfig);
    parallelFor(
       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-         PotVortFluxOnE(NumPotVortFlux, IEdge, KLevel, NormRelVortEdge,
-                        NormPlanetVortEdge, ThickFluxEdge, NormVelEdge);
+         PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLevel, NormRelVortEdge,
+                        NormPlanetVortEdge, LayerThickEdge, NormVelEdge);
       });
 
    // Compute errors
-   ErrorMeasures PotVortFluxErrors;
-   Err += computeErrors(PotVortFluxErrors, NumPotVortFlux, ExactPotVortFlux,
+   ErrorMeasures PotVortHAdvErrors;
+   Err += computeErrors(PotVortHAdvErrors, NumPotVortHAdv, ExactPotVortHAdv,
                         Mesh, OnEdge, NVertLevels);
 
 
    std::cout << std::setprecision(20);
-   std::cout << "PotVortFluxErrors:  ";
-   std::cout << PotVortFluxErrors.L2 << " " << PotVortFluxErrors.LInf <<
+   std::cout << "PotVortHAdvErrors:  ";
+   std::cout << PotVortHAdvErrors.L2 << " " << PotVortHAdvErrors.LInf <<
                 std::endl;
-*/
-} // end testPotVortFlux
+
+//   auto velH = createHostMirrorCopy(NormVelEdge);
+//   auto perpH = createHostMirrorCopy(PerpVelEdge);
+//   auto numVelH = createHostMirrorCopy(NumPotVortHAdv);
+//   for(int IEdge = 0; IEdge < Mesh->NEdgesOwned; ++IEdge) {
+//      fprintf(ofptr1, "%8d    %24.15e    %24.15e    %24.15e\n", IEdge, velH(IEdge, 0), perpH(IEdge,0), numVelH(IEdge,0));
+////      for(int K = 0; K < NVertLevels; ++K) {
+////         fprintf(ofptr1, "%8d     %24.15e", IEdge, KEGradH(IEdge, K));
+////      }
+////      fprintf(ofptr1, "\n");
+//   }
+//   fclose(ofptr1);
+
+} // end testPotVortHAdv
 
 int testKEGrad(int NVertLevels, Real RTol) {
 
@@ -617,7 +622,7 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
    Config *TendConfig;
-/*
+
    // TODO: move to Mesh constructor
    Mesh->setMasks(NVertLevels);
 
@@ -680,7 +685,7 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
    std::cout << std::setprecision(20);
    std::cout << "VelHyperDiffErrors:  ";
    std::cout << VelHyperDiffErrors.L2 << " " << VelHyperDiffErrors.LInf << std::endl;
-*/
+
    return Err;
 } // end testVelHyperDiff
 
@@ -745,7 +750,7 @@ void tendencyTermsTest(const std::string &mesh = DefaultMeshFile) {
 
    Err += testThickFluxDiv(NVertLevels, RTol);
 
-   Err += testPotVortFlux(NVertLevels, RTol);
+   Err += testPotVortHAdv(NVertLevels, RTol);
 
    Err += testKEGrad(NVertLevels, RTol);
 

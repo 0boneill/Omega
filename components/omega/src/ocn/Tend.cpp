@@ -14,7 +14,7 @@ ThicknessFluxDivOnCell::ThicknessFluxDivOnCell(
 //    Options->get("ThicknessFluxTendencyEnable", Enabled);
 }
 
-PotentialVortFluxOnEdge::PotentialVortFluxOnEdge(
+PotentialVortHAdvOnEdge::PotentialVortHAdvOnEdge(
     const HorzMesh *Mesh, Config *Options)
     : NEdgesOnEdge(Mesh->NEdgesOnEdge), EdgesOnEdge(Mesh->EdgesOnEdge),
       WeightsOnEdge(Mesh->WeightsOnEdge) {
