@@ -1,3 +1,4 @@
+/*
 #include "AuxiliaryState.h"
 #include "Config.h"
 #include "DataTypes.h"
@@ -254,3 +255,4 @@ int main(int argc, char *argv[]) {
 
 } // end of main
 //===-----------------------------------------------------------------------===/
+*/

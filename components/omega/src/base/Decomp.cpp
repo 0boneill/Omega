@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Config.h"
 #include "Decomp.h"
 #include "DataTypes.h"
 #include "IO.h"
@@ -332,11 +333,23 @@ int Decomp::init(const std::string &MeshFileName) {
 
    int Err = 0; // default successful return code
 
-   // TODO: retrieve from Config when available - currently hardwired
+   I4 InHaloWidth               = 3;
+   std::string DecompMethodStr  = "MetisKWay";
+
    // Initialize decomposition options
-   I4 InHaloWidth           = 3;
-   std::string DecompMethod = "MetisKWay";
-   PartMethod Method        = getPartMethodFromStr(DecompMethod);
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config DecompConfig("Decomp");
+   if (OmegaConfig->existsGroup("Decomp")) {
+      Err = OmegaConfig->get(DecompConfig);
+      if (DecompConfig.existsVar("HaloWidth")) {
+         Err = DecompConfig.get("HaloWidth", InHaloWidth);
+      }
+      if (DecompConfig.existsVar("DecompMethod")) {
+         Err = DecompConfig.get("DecompMethod", DecompMethodStr);
+      }
+   }
+
+   PartMethod Method = getPartMethodFromStr(DecompMethodStr);
 
    // Retrieve the default machine environment
    MachEnv *DefEnv = MachEnv::getDefault();

@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OceanState.h"
+#include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
 #include "Halo.h"
@@ -41,19 +42,30 @@ int OceanState::init() {
    int NTimeLevels = 2;
    int NVertLevels = 60;
 
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config StateConfig("State");
+   if (OmegaConfig->existsGroup("State")) {
+      Err = OmegaConfig->get(StateConfig);
+      if (StateConfig.existsVar("NTimeLevels")) {
+         Err = StateConfig.get("NTimeLevels", NTimeLevels);
+      }
+   }
+
    // Create the default state and set pointer to it
-   OceanState::DefaultOceanState = create("Default", DefHorzMesh, DefDecomp,
-                                          DefHalo, NVertLevels, NTimeLevels);
+   OceanState::DefaultOceanState =
+       create("Default", DefHorzMesh, DefHalo, NVertLevels, NTimeLevels);
+
+   DefaultOceanState->loadStateFromFile(DefHorzMesh->MeshFileName, DefDecomp);
+
    return Err;
 }
 
 //------------------------------------------------------------------------------
-// Construct a new local state given a decomposition
+// Construct a new local state
 
 OceanState::OceanState(
     const std::string &Name_, //< [in] Name for new state
     HorzMesh *Mesh,           //< [in] HorzMesh for state
-    Decomp *MeshDecomp,       //< [in] Decomp for Mesh
     Halo *MeshHalo_,          //< [in] Halo for Mesh
     const int NVertLevels_,   //< [in] number of vertical levels
     const int NTimeLevels_    //< [in] number of time levels
@@ -70,13 +82,12 @@ OceanState::OceanState(
 
    NVertLevels = NVertLevels_;
    NTimeLevels = NTimeLevels_;
-   CurLevel    = NTimeLevels - 2;
+   CurLevel    = std::max(0, NTimeLevels - 2);
    NewLevel    = NTimeLevels - 1;
 
    MeshHalo = MeshHalo_;
 
-   StateFileName = Mesh->MeshFileName;
-   Name          = Name_;
+   Name = Name_;
 
    // Allocate state host arrays
    for (int I = 0; I < NTimeLevels; I++) {
@@ -86,29 +97,14 @@ OceanState::OceanState(
                                          NEdgesSize, NVertLevels);
    }
 
-   // Open the state file for reading (assume IO has already been initialized)
-   I4 Err;
-   Err = IO::openFile(StateFileID, StateFileName, IO::ModeRead);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error opening state file");
-
-   // Create the parallel IO decompositions required to read in state variables
-   initParallelIO(MeshDecomp);
-
-   // Read layerThickness and normalVelocity
-   read();
-
-   // Destroy the parallel IO decompositions
-   finalizeParallelIO();
-
-   // Register fields and metadata for IO
-   defineIOFields();
-
    // Create device arrays and copy host data
    for (int I = 0; I < NTimeLevels; I++) {
       LayerThickness[I] = createDeviceMirrorCopy(LayerThicknessH[I]);
       NormalVelocity[I] = createDeviceMirrorCopy(NormalVelocityH[I]);
    }
+
+   // Register fields and metadata for IO
+   defineIOFields();
 
 } // end state constructor
 
@@ -117,7 +113,6 @@ OceanState::OceanState(
 OceanState *
 OceanState::create(const std::string &Name, //< [in] Name for new state
                    HorzMesh *Mesh,          //< [in] HorzMesh for state
-                   Decomp *MeshDecomp,      //< [in] Decomp for Mesh
                    Halo *MeshHalo,          //< [in] Halo for Mesh
                    const int NVertLevels,   //< [in] number of vertical levels
                    const int NTimeLevels    //< [in] number of time levels
@@ -135,8 +130,8 @@ OceanState::create(const std::string &Name, //< [in] Name for new state
 
    // create a new state on the heap and put it in a map of
    // unique_ptrs, which will manage its lifetime
-   auto *NewOceanState = new OceanState(Name, Mesh, MeshDecomp, MeshHalo,
-                                        NVertLevels, NTimeLevels);
+   auto *NewOceanState =
+       new OceanState(Name, Mesh, MeshHalo, NVertLevels, NTimeLevels);
    AllOceanStates.emplace(Name, NewOceanState);
 
    return NewOceanState;
@@ -176,8 +171,37 @@ void OceanState::clear() {
 } // end clear
 
 //------------------------------------------------------------------------------
+// Load state from file
+void OceanState::loadStateFromFile(const std::string &StateFileName,
+                                   Decomp *MeshDecomp) {
+
+   int StateFileID;
+   I4 CellDecompR8;
+   I4 EdgeDecompR8;
+
+   // Open the state file for reading (assume IO has already been initialized)
+   I4 Err;
+   Err = IO::openFile(StateFileID, StateFileName, IO::ModeRead);
+   if (Err != 0)
+      LOG_CRITICAL("OceanState: error opening state file");
+
+   // Create the parallel IO decompositions required to read in state variables
+   initParallelIO(CellDecompR8, EdgeDecompR8, MeshDecomp);
+
+   // Read layerThickness and normalVelocity
+   read(StateFileID, CellDecompR8, EdgeDecompR8);
+
+   // Destroy the parallel IO decompositions
+   finalizeParallelIO(CellDecompR8, EdgeDecompR8);
+
+   // Sync with device
+   copyToDevice(CurLevel);
+} // end loadStateFromFile
+
+//------------------------------------------------------------------------------
 // Initialize the parallel IO decompositions for the mesh variables
-void OceanState::initParallelIO(Decomp *MeshDecomp) {
+void OceanState::initParallelIO(I4 &CellDecompR8, I4 &EdgeDecompR8,
+                                Decomp *MeshDecomp) {
 
    I4 Err;
    I4 NDims             = 3;
@@ -284,7 +308,7 @@ void OceanState::defineIOFields() {
 
 //------------------------------------------------------------------------------
 // Destroy parallel decompositions
-void OceanState::finalizeParallelIO() {
+void OceanState::finalizeParallelIO(I4 CellDecompR8, I4 EdgeDecompR8) {
 
    int Err = 0; // default return code
 
@@ -302,7 +326,7 @@ void OceanState::finalizeParallelIO() {
 
 //------------------------------------------------------------------------------
 // Read Ocean State
-void OceanState::read() {
+void OceanState::read(int StateFileID, I4 CellDecompR8, I4 EdgeDecompR8) {
 
    I4 Err;
 
@@ -341,6 +365,15 @@ void OceanState::copyToHost(int TimeLevel) {
    deepCopy(NormalVelocityH[TimeLevel], NormalVelocity[TimeLevel]);
 
 } // end copyToHost
+
+//------------------------------------------------------------------------------
+// Perform state halo exchange
+void OceanState::exchangeHalo(int TimeLevel) {
+   copyToHost(TimeLevel);
+   MeshHalo->exchangeFullArrayHalo(LayerThicknessH[TimeLevel], OnCell);
+   MeshHalo->exchangeFullArrayHalo(NormalVelocityH[TimeLevel], OnEdge);
+   copyToDevice(TimeLevel);
+} // end exchangeHalo
 
 //------------------------------------------------------------------------------
 // Perform time level update

@@ -1,6 +1,7 @@
 #ifndef OMEGA_AUX_THICKNESS_H
 #define OMEGA_AUX_THICKNESS_H
 
+#include "Config.h"
 #include "DataTypes.h"
 #include "HorzMesh.h"
 #include "OmegaKokkos.h"

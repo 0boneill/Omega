@@ -196,7 +196,7 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // Compute exact result
    Array2DReal ExactThickFluxDiv("ExactThickFluxDiv", Mesh->NCellsOwned,
@@ -208,6 +208,10 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
 
    // Set input array
    Array2DR8 ThickFluxEdge("ThickFluxEdge", Mesh->NEdgesSize, NVertLevels);
+
+   // TODO(mwarusz) temporary fix for this test
+   Array2DR8 OnesEdge("OnesEdge", Mesh->NEdgesSize, NVertLevels);
+   deepCopy(OnesEdge, 1);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -222,7 +226,8 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
    ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh, TendConfig);
    parallelFor(
        {Mesh->NCellsOwned, NVertLevels}, KOKKOS_LAMBDA(int ICell, int KLevel) {
-          ThickFluxDivOnC(NumThickFluxDiv, ICell, KLevel, ThickFluxEdge);
+          ThickFluxDivOnC(NumThickFluxDiv, ICell, KLevel, OnesEdge,
+                          ThickFluxEdge);
        });
 
    // Compute errors
@@ -255,7 +260,7 @@ int testPotVortHAdv(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // Compute exact result
    Array2DReal ExactPotVortHAdv("ExactPotVortHAdv", Mesh->NEdgesOwned,
@@ -339,7 +344,7 @@ int testKEGrad(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // Compute exact result
    Array2DReal ExactKEGrad("ExactKEGrad", Mesh->NEdgesOwned, NVertLevels);
@@ -398,7 +403,7 @@ int testSSHGrad(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // Compute exact result
    Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLevels);
@@ -457,7 +462,7 @@ int testVelDiff(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // TODO: move to Mesh constructor
    Mesh->setMasks(NVertLevels);
@@ -525,7 +530,7 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
 
    const auto Mesh = HorzMesh::getDefault();
    // TODO: implement config, dummy config for now
-   Config *TendConfig;
+   Config *TendConfig = Config::getOmegaConfig();
 
    // TODO: move to Mesh constructor
    Mesh->setMasks(NVertLevels);

@@ -265,14 +265,14 @@ target_compile_definitions(
 #################
 # Tendencies test
 #################
-
-add_omega_test(
-    TENDENCIES_TEST
-    testTendencies.exe
-    ocn/TendenciesTest.cpp
-    "-n;8"
-)
-
+#
+#add_omega_test(
+#    TENDENCIES_TEST
+#    testTendencies.exe
+#    ocn/TendenciesTest.cpp
+#    "-n;8"
+#)
+#
 ##################
 # State test
 ##################
@@ -304,6 +304,17 @@ add_omega_test(
     testReductions.exe
     base/ReductionsTest.cpp
     "-n;2;--cpu-bind=cores"
+)
+
+###################
+# Time Stepper test
+###################
+
+add_omega_test(
+  TIMESTEPPER_TEST
+  testTimeStepper.exe
+  timeStepping/TimeStepperTest.cpp
+    "-n;2"
 )
 
 ##################

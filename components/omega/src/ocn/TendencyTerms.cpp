@@ -26,12 +26,17 @@ int Tendencies::init() {
    int Err = 0;
 
    HorzMesh *DefHorzMesh = HorzMesh::getDefault();
-   Config *TendConfig;
+
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config TendConfig("Tendencies");
+   if (OmegaConfig->existsGroup("Tendencies")) {
+      Err = OmegaConfig->get(TendConfig);
+   }
 
    int NVertLevels = 60;
 
    Tendencies::DefaultTendencies =
-       Tendencies::create("Default", DefHorzMesh, NVertLevels, TendConfig);
+       create("Default", DefHorzMesh, NVertLevels, &TendConfig);
 
    return Err;
 
@@ -51,7 +56,7 @@ void Tendencies::clear() { AllTendencies.clear(); } // end clear
 
 //------------------------------------------------------------------------------
 // Removes tendencies from list by name
-void Tendencies::erase(const std::string &Name) {
+void Tendencies::erase(const std::string Name) {
 
    AllTendencies.erase(Name);
 
@@ -67,7 +72,7 @@ Tendencies *Tendencies::getDefault() {
 
 //------------------------------------------------------------------------------
 // Get tendencies by name
-Tendencies *Tendencies::get(const std::string &Name ///< [in] Name of tendencies
+Tendencies *Tendencies::get(const std::string Name ///< [in] Name of tendencies
 ) {
 
    auto it = AllTendencies.find(Name);
@@ -84,34 +89,18 @@ Tendencies *Tendencies::get(const std::string &Name ///< [in] Name of tendencies
 } // end get tendencies
 
 //------------------------------------------------------------------------------
-// Create a non-default group of tendencies
-Tendencies *Tendencies::create(const std::string &Name, const HorzMesh *Mesh,
-                               int NVertLevels, Config *Options) {
-
-   if (AllTendencies.find(Name) != AllTendencies.end()) {
-      LOG_ERROR("Attempted to create a new Tendencies with name {} but it "
-                "already exists",
-                Name);
-      return nullptr;
-   }
-
-   auto *NewTendencies = new Tendencies(Name, Mesh, NVertLevels, Options);
-   AllTendencies.emplace(Name, NewTendencies);
-
-   return NewTendencies;
-
-} // end create tendencies
-
-//------------------------------------------------------------------------------
 // Construct a new group of tendencies
 Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
                        const HorzMesh *Mesh,    ///< [in] Horizontal mesh
                        int NVertLevels, ///< [in] Number of vertical levels
-                       Config *Options  ///< [in] Configuration options
-                       )
+                       Config *Options, ///< [in] Configuration options
+                       CustomTendencyType InCustomThicknessTend,
+                       CustomTendencyType InCustomVelocityTend)
     : ThicknessFluxDiv(Mesh, Options), PotientialVortHAdv(Mesh, Options),
       KEGrad(Mesh, Options), SSHGrad(Mesh, Options),
-      VelocityDiffusion(Mesh, Options), VelocityHyperDiff(Mesh, Options) {
+      VelocityDiffusion(Mesh, Options), VelocityHyperDiff(Mesh, Options),
+      CustomThicknessTend(InCustomThicknessTend),
+      CustomVelocityTend(InCustomVelocityTend) {
 
    // Tendency arrays
    LayerThicknessTend =
@@ -119,24 +108,36 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
    NormalVelocityTend =
        Array2DReal("NormalVelocityTend", Mesh->NEdgesSize, NVertLevels);
 
-   // Array dimension lengths
-   NCellsOwned = Mesh->NCellsOwned;
-   NEdgesOwned = Mesh->NEdgesOwned;
-   NChunks     = NVertLevels / VecLength;
+   //
+   NCellsAll = Mesh->NCellsAll;
+   NEdgesAll = Mesh->NEdgesAll;
+   NChunks   = NVertLevels / VecLength;
 
 } // end constructor
 
+Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
+                       const HorzMesh *Mesh,    ///< [in] Horizontal mesh
+                       int NVertLevels, ///< [in] Number of vertical levels
+                       Config *Options) ///< [in] Configuration options
+    : Tendencies(Name, Mesh, NVertLevels, Options, CustomTendencyType{},
+                 CustomTendencyType{}) {}
+
 //------------------------------------------------------------------------------
 // Compute tendencies for layer thickness equation
-void Tendencies::computeThicknessTendencies(
-    const OceanState *State,       ///< [in] State variables
-    const AuxiliaryState *AuxState ///< [in] Auxilary state variables
+// TODO Add AuxilaryState as argument
+void Tendencies::computeThicknessTendenciesOnly(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int ThickTimeLevel,       ///< [in] Time level
+    int VelTimeLevel,         ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
    OMEGA_SCOPE(LocLayerThicknessTend, LayerThicknessTend);
-   OMEGA_SCOPE(LocNCellsOwned, NCellsOwned);
+   OMEGA_SCOPE(LocNCellsAll, NCellsAll);
    OMEGA_SCOPE(LocNChunks, NChunks);
    OMEGA_SCOPE(LocThicknessFluxDiv, ThicknessFluxDiv);
+   const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
 
    deepCopy(LocLayerThicknessTend, 0);
 
@@ -146,23 +147,31 @@ void Tendencies::computeThicknessTendencies(
 
    if (LocThicknessFluxDiv.Enabled) {
       parallelFor(
-          {LocNCellsOwned, LocNChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+          {LocNCellsAll, LocNChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
              LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
-                                 ThickFluxEdge);
+                                 ThickFluxEdge, NormalVelEdge);
           });
+   }
+
+   if (CustomThicknessTend) {
+      CustomThicknessTend(LocLayerThicknessTend, State, AuxState,
+                          ThickTimeLevel, VelTimeLevel, Time);
    }
 
 } // end thickness tendency compute
 
 //------------------------------------------------------------------------------
 // Compute tendencies for normal velocity equation
-void Tendencies::computeVelocityTendencies(
-    const OceanState *State,       ///< [in] State variables
-    const AuxiliaryState *AuxState ///< [in] Auxilary state variables
+void Tendencies::computeVelocityTendenciesOnly(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int ThickTimeLevel,       ///< [in] Time level
+    int VelTimeLevel,         ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
    OMEGA_SCOPE(LocNormalVelocityTend, NormalVelocityTend);
-   OMEGA_SCOPE(LocNEdgesOwned, NEdgesOwned);
+   OMEGA_SCOPE(LocNEdgesAll, NEdgesAll);
    OMEGA_SCOPE(LocNChunks, NChunks);
    OMEGA_SCOPE(LocPotientialVortHAdv, PotientialVortHAdv);
    OMEGA_SCOPE(LocKEGrad, KEGrad);
@@ -177,10 +186,10 @@ void Tendencies::computeVelocityTendencies(
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
    const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
    const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
-   const Array2DReal &NormVelEdge   = State->NormalVelocity[0];
+   const Array2DReal &NormVelEdge   = State->NormalVelocity[VelTimeLevel];
    if (LocPotientialVortHAdv.Enabled) {
       parallelFor(
-          {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {LocNEdgesAll, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
                                    NormRVortEdge, NormFEdge, FluxLayerThickEdge,
                                    NormVelEdge);
@@ -191,7 +200,7 @@ void Tendencies::computeVelocityTendencies(
    const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
    if (LocKEGrad.Enabled) {
       parallelFor(
-          {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {LocNEdgesAll, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
           });
    }
@@ -200,7 +209,7 @@ void Tendencies::computeVelocityTendencies(
    const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
       parallelFor(
-          {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {LocNEdgesAll, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
           });
    }
@@ -210,7 +219,7 @@ void Tendencies::computeVelocityTendencies(
    const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
    if (LocVelocityDiffusion.Enabled) {
       parallelFor(
-          {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {LocNEdgesAll, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
                                   RVortVertex);
           });
@@ -222,26 +231,98 @@ void Tendencies::computeVelocityTendencies(
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
    if (LocVelocityHyperDiff.Enabled) {
       parallelFor(
-          {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {LocNEdgesAll, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
                                   Del2DivCell, Del2RVortVertex);
           });
    }
 
+   if (CustomVelocityTend) {
+      CustomVelocityTend(LocNormalVelocityTend, State, AuxState, ThickTimeLevel,
+                         VelTimeLevel, Time);
+   }
+
 } // end velocity tendency compute
+
+void Tendencies::computeThicknessTendencies(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int ThickTimeLevel,       ///< [in] Time level
+    int VelTimeLevel,         ///< [in] Time level
+    Real Time                 ///< [in] Time
+) {
+   // only need LayerThicknessAux on edge
+   OMEGA_SCOPE(LayerThicknessAux, AuxState->LayerThicknessAux);
+   OMEGA_SCOPE(LayerThickCell, State->LayerThickness[ThickTimeLevel]);
+   OMEGA_SCOPE(NormalVelEdge, State->NormalVelocity[VelTimeLevel]);
+
+   parallelFor(
+       "computeLayerThickAux", {NEdgesAll, NChunks},
+       KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
+                                              NormalVelEdge);
+       });
+
+   computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
+                                  Time);
+}
+
+void Tendencies::computeThicknessTendencies(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
+) {
+   computeThicknessTendencies(State, AuxState, TimeLevel, TimeLevel, Time);
+}
+
+void Tendencies::computeVelocityTendencies(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int ThickTimeLevel,       ///< [in] Time level
+    int VelTimeLevel,         ///< [in] Time level
+    Real Time                 ///< [in] Time
+) {
+   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel);
+   computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
+                                 Time);
+}
+
+void Tendencies::computeVelocityTendencies(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
+) {
+   computeVelocityTendencies(State, AuxState, TimeLevel, TimeLevel, Time);
+}
 
 //------------------------------------------------------------------------------
 // Compute both layer thickness and normal velocity tendencies
 void Tendencies::computeAllTendencies(
-    const OceanState *State,       ///< [in] State variables
-    const AuxiliaryState *AuxState ///< [in] Auxilary state variables
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int ThickTimeLevel,       ///< [in] Time level
+    int VelTimeLevel,         ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
-   AuxState->computeAll(State, 0);
-   computeThicknessTendencies(State, AuxState);
-   computeVelocityTendencies(State, AuxState);
+   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel);
+   computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
+                                  Time);
+   computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
+                                 Time);
 
 } // end all tendency compute
+
+void Tendencies::computeAllTendencies(
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
+) {
+   computeAllTendencies(State, AuxState, TimeLevel, TimeLevel, Time);
+}
 
 // TODO: Implement Config options for all constructors
 ThicknessFluxDivOnCell::ThicknessFluxDivOnCell(const HorzMesh *Mesh,
@@ -250,7 +331,9 @@ ThicknessFluxDivOnCell::ThicknessFluxDivOnCell(const HorzMesh *Mesh,
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell) {
 
-   // Options->get("ThicknessFluxTendencyEnable", Enabled);
+    if (Options->existsVar("ThicknessFluxTendencyEnable")) {
+       Options->get("ThicknessFluxTendencyEnable", Enabled);
+    }
 }
 
 PotentialVortHAdvOnEdge::PotentialVortHAdvOnEdge(const HorzMesh *Mesh,
@@ -258,19 +341,25 @@ PotentialVortHAdvOnEdge::PotentialVortHAdvOnEdge(const HorzMesh *Mesh,
     : NEdgesOnEdge(Mesh->NEdgesOnEdge), EdgesOnEdge(Mesh->EdgesOnEdge),
       WeightsOnEdge(Mesh->WeightsOnEdge) {
 
-   // Options->get("PVTendencyEnable", Enabled);
+    if (Options->existsVar("PVTendencyEnable")) {
+       Options->get("PVTendencyEnable", Enabled);
+    }
 }
 
 KEGradOnEdge::KEGradOnEdge(const HorzMesh *Mesh, Config *Options)
     : CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge) {
 
-   // Options->get("KETendencyEnable", Enabled);
+    if (Options->existsVar("KETendencyEnable")) {
+       Options->get("KETendencyEnable", Enabled);
+    }
 }
 
 SSHGradOnEdge::SSHGradOnEdge(const HorzMesh *Mesh, Config *Options)
     : CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge) {
 
-   // Options->get("SSHTendencyEnable", Enabled);
+    if (Options->existsVar("SSHTendencyEnable")) {
+       Options->get("SSHTendencyEnable", Enabled);
+    }
 }
 
 VelocityDiffusionOnEdge::VelocityDiffusionOnEdge(const HorzMesh *Mesh,
@@ -279,8 +368,12 @@ VelocityDiffusionOnEdge::VelocityDiffusionOnEdge(const HorzMesh *Mesh,
       DcEdge(Mesh->DcEdge), DvEdge(Mesh->DvEdge),
       MeshScalingDel2(Mesh->MeshScalingDel2), EdgeMask(Mesh->EdgeMask) {
 
-   // Options->get("VelDiffTendencyEnable", Enabled);
-   // Options->get("ViscDel2", ViscDel2);
+    if (Options->existsVar("VelDiffTendencyEnable")) {
+       Options->get("VelDiffTendencyEnable", Enabled);
+    }
+    if (Options->existsVar("ViscDel2")) {
+       Options->get("ViscDel2", ViscDel2);
+    }
 }
 
 VelocityHyperDiffOnEdge::VelocityHyperDiffOnEdge(const HorzMesh *Mesh,
@@ -289,8 +382,12 @@ VelocityHyperDiffOnEdge::VelocityHyperDiffOnEdge(const HorzMesh *Mesh,
       DcEdge(Mesh->DcEdge), DvEdge(Mesh->DvEdge),
       MeshScalingDel4(Mesh->MeshScalingDel4), EdgeMask(Mesh->EdgeMask) {
 
-   // Options->get("VelHyperDiffTendencyEnable", Enabled);
-   // Options->get("ViscDel4", ViscDel4);
+    if (Options->existsVar("VelHyperDiffTendencyEnable")) {
+       Options->get("VelHyperDiffTendencyEnable", Enabled);
+    }
+    if (Options->existsVar("ViscDel4")) {
+       Options->get("ViscDel4", ViscDel4);
+    }
 }
 
 } // end namespace OMEGA

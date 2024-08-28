@@ -1,0 +1,62 @@
+omega:
+   timeManagement:
+      doRestart: false
+      restartTimestampName: restartTimestamp
+      startTime: 0001-01-01_00:00:00
+      stopTime: none
+      runDuration: 0010_00:00:00
+      calendarType: noleap
+
+   Decomp:
+      HaloWidth: 3
+      MeshFileName: OmegaMesh.nc
+      DecompMethod: MetisKWay
+
+   Tendencies:
+      ThicknessFluxTendencyEnable: true
+      PVTendencyEnable: true
+      KETendencyEnable: true
+      SSHTendencyEnable: true
+      VelDiffTendencyEnable: true
+      ViscDel2: 1.0e3
+      VelHyperDiffTendencyEnable: true
+      ViscDel4: 1.2e11
+
+   Advection:
+      FluxThicknessType: Center
+
+   hmix:
+      hmixScaleWithMesh: false
+      maxMeshDensity: -1.0
+      hmixUseRefWidth: false
+      hmixRefWidth: 30.0e3
+
+   IO:
+      IOTasks:  1
+      IOStride: 1
+      IORearranger: box
+      IODefaultFormat: NetCDF4
+
+   streams:
+
+      mesh:
+         type: input
+         filenameTemplate: mesh.nc
+         inputInterval: initial_only
+
+      output:
+         type: output
+         filenameTemplate: output/output.$Y-$M-$D_$h.$m.$s.nc
+         filenameInterval: 01-00-00_00:00:00
+         referenceTime: 0001-01-01_00:00:00
+         clobberMode: truncate
+         precision: single
+         outputInterval: 0001_00:00:00
+         contents:
+         - tracers
+         - layerThickness
+         - ssh
+         - kineticEnergyCell
+         - relativeVorticityCell
+#         - [other fields]
+
