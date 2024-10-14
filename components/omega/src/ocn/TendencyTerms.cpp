@@ -28,6 +28,9 @@ int Tendencies::init() {
    HorzMesh *DefHorzMesh = HorzMesh::getDefault();
 
    I4 NVertLevels = DefHorzMesh->NVertLevels;
+   // TODO: fetch NTracers
+//   I4 NTracers = 5;
+   I4 NTracers = Tracers::getNumTracers();
 
    // Get TendConfig group
    Config *OmegaConfig = Config::getOmegaConfig();
@@ -39,7 +42,7 @@ int Tendencies::init() {
    }
 
    Tendencies::DefaultTendencies =
-       create("Default", DefHorzMesh, NVertLevels, &TendConfig);
+       create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig);
 
    Err = DefaultTendencies->readTendConfig(&TendConfig);
 
@@ -161,6 +164,7 @@ int Tendencies::readTendConfig(Config *TendConfig ///< [in] Tendencies subconfig
 Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
                        const HorzMesh *Mesh,    ///< [in] Horizontal mesh
                        int NVertLevels, ///< [in] Number of vertical levels
+                       int NTracers,    ///< [in] Number of tracers
                        Config *Options, ///< [in] Configuration options
                        CustomTendencyType InCustomThicknessTend,
                        CustomTendencyType InCustomVelocityTend)
@@ -185,9 +189,10 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
 Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
                        const HorzMesh *Mesh,    ///< [in] Horizontal mesh
                        int NVertLevels, ///< [in] Number of vertical levels
+                       int NTracers,    ///< [in] Number of tracers
                        Config *Options) ///< [in] Configuration options
-    : Tendencies(Name, Mesh, NVertLevels, Options, CustomTendencyType{},
-                 CustomTendencyType{}) {}
+    : Tendencies(Name, Mesh, NVertLevels, NTracers, Options,
+                 CustomTendencyType{}, CustomTendencyType{}) {}
 
 //------------------------------------------------------------------------------
 // Compute tendencies for layer thickness equation
@@ -196,6 +201,7 @@ void Tendencies::computeThicknessTendenciesOnly(
     const AuxiliaryState *AuxState, ///< [in] Auxilary state variables
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
+    int TraceTimeLevel,             ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
 
@@ -231,6 +237,7 @@ void Tendencies::computeVelocityTendenciesOnly(
     const AuxiliaryState *AuxState, ///< [in] Auxilary state variables
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
+    int TraceTimeLevel,             ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
 
@@ -311,6 +318,7 @@ void Tendencies::computeThicknessTendencies(
     const AuxiliaryState *AuxState, ///< [in] Auxilary state variables
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
+    int TraceTimeLevel,             ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
    // only need LayerThicknessAux on edge
@@ -326,7 +334,7 @@ void Tendencies::computeThicknessTendencies(
        });
 
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
-                                  Time);
+                                  TraceTimeLevel, Time);
 }
 
 void Tendencies::computeVelocityTendencies(
@@ -334,11 +342,12 @@ void Tendencies::computeVelocityTendencies(
     const AuxiliaryState *AuxState, ///< [in] Auxilary state variables
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
+    int TraceTimeLevel,             ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
-   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel);
+   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel, TraceTimeLevel);
    computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
-                                 Time);
+                                 TraceTimeLevel, Time);
 }
 
 //------------------------------------------------------------------------------
@@ -348,14 +357,15 @@ void Tendencies::computeAllTendencies(
     const AuxiliaryState *AuxState, ///< [in] Auxilary state variables
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
+    int TraceTimeLevel,             ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
 
-   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel);
+   AuxState->computeAll(State, ThickTimeLevel, VelTimeLevel, TraceTimeLevel);
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
-                                  Time);
+                                  TraceTimeLevel, Time);
    computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
-                                 Time);
+                                 TraceTimeLevel, Time);
 
 } // end all tendency compute
 

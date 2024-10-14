@@ -7,8 +7,10 @@
 #include "OceanState.h"
 #include "auxiliaryVars/KineticAuxVars.h"
 #include "auxiliaryVars/LayerThicknessAuxVars.h"
+#include "auxiliaryVars/TracerAuxVars.h"
 #include "auxiliaryVars/VelocityDel2AuxVars.h"
 #include "auxiliaryVars/VorticityAuxVars.h"
+#include "Tracers.h"
 
 #include <memory>
 #include <string>
@@ -31,6 +33,7 @@ class AuxiliaryState {
    // Auxiliary variables
    KineticAuxVars KineticAux;
    LayerThicknessAuxVars LayerThicknessAux;
+   TracerAuxVars TracerAux;
    VorticityAuxVars VorticityAux;
    VelocityDel2AuxVars VelocityDel2Aux;
 
@@ -43,7 +46,7 @@ class AuxiliaryState {
 
    // Create a non-default auxiliary state
    static AuxiliaryState *create(const std::string &Name, const HorzMesh *Mesh,
-                                 int NVertLevels);
+                                 int NVertLevels, int NTracers);
 
    /// Get the default auxiliary state
    static AuxiliaryState *getDefault();
@@ -63,12 +66,12 @@ class AuxiliaryState {
    /// Compute all auxiliary variables based on an ocean state at a given time
    /// level
    void computeAll(const OceanState *State, int ThickTimeLevel,
-                   int VelTimeLevel) const;
+                   int VelTimeLevel, int TraceTimeLevel) const;
    void computeAll(const OceanState *State, int TimeLevel) const;
 
  private:
    AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
-                  int NVertLevels);
+                  int NVertLevels, int NTracers);
 
    AuxiliaryState(const AuxiliaryState &) = delete;
    AuxiliaryState(AuxiliaryState &&)      = delete;

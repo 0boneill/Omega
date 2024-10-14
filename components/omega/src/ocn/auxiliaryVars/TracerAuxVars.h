@@ -2,6 +2,7 @@
 #define OMEGA_AUX_TRACER_H
 
 #include "DataTypes.h"
+#include "Field.h"
 #include "HorzMesh.h"
 #include "OmegaKokkos.h"
 #include "auxiliaryVars/LayerThicknessAuxVars.h"
@@ -86,6 +87,10 @@ class TracerAuxVars {
          Del2TracersOnCell(L, ICell, K) = Del2TrCellTmp[KVec] * InvAreaCell;
       }
    }
+
+   void registerFields(const std::string &AuxGroupName,
+                       const std::string &MeshName) const;
+   void unregisterFields() const;
 
  private:
    Array1DI4 NEdgesOnCell;

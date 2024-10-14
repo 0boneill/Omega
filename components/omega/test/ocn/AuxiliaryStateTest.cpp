@@ -38,6 +38,7 @@ struct TestSetup {
 
 constexpr Geometry Geom   = Geometry::Spherical;
 constexpr int NVertLevels = 60;
+constexpr int NTracers = 5;
 
 int initState() {
    int Err = 0;
@@ -107,7 +108,7 @@ int initAuxStateTest(const std::string &mesh) {
       LOG_ERROR("AuxStateTest: error initializing default mesh");
    }
 
-   int TimeStepperErr = TimeStepper::init();
+   int TimeStepperErr = TimeStepper::init1();
    if (TimeStepperErr != 0) {
       Err++;
       LOG_ERROR("AuxStateTest: error initializing default time stepper");
@@ -149,7 +150,7 @@ int testAuxState() {
 
    const auto *Mesh = HorzMesh::getDefault();
    // test creation of another auxiliary state
-   AuxiliaryState::create("AnotherAuxState", Mesh, 12);
+   AuxiliaryState::create("AnotherAuxState", Mesh, 12, 3);
 
    // test retrievel of another
    if (AuxiliaryState::get("AnotherAuxState")) {

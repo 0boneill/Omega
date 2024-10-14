@@ -72,7 +72,7 @@ int initStateTest() {
       LOG_ERROR("State: error initializing default mesh");
 
    // Initialize the default time stepper
-   Err = OMEGA::TimeStepper::init();
+   Err = OMEGA::TimeStepper::init1();
    if (Err != 0)
       LOG_ERROR("State: error initializing default time stepper");
 

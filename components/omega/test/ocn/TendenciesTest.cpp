@@ -108,7 +108,7 @@ int initTendenciesTest(const std::string &mesh) {
       LOG_ERROR("TendenciesTest: error initializing default mesh");
    }
 
-   int TimeStepperErr = TimeStepper::init();
+   int TimeStepperErr = TimeStepper::init1();
    if (TimeStepperErr != 0) {
       Err++;
       LOG_ERROR("TendenciesTest: error initializing default time stepper");
@@ -167,7 +167,7 @@ int testTendencies() {
    const auto *Mesh = HorzMesh::getDefault();
    // test creation of another tendencies
    Config *Options = Config::getOmegaConfig();
-   Tendencies::create("TestTendencies", Mesh, 12, Options);
+   Tendencies::create("TestTendencies", Mesh, 12, 3, Options);
 
    // test retrievel of another tendencies
    if (Tendencies::get("TestTendencies")) {
@@ -196,9 +196,10 @@ int testTendencies() {
    const auto *AuxState = AuxiliaryState::getDefault();
    int ThickTimeLevel   = 0;
    int VelTimeLevel     = 0;
+   int TraceTimeLevel   = 0;
    TimeInstant Time;
    DefTendencies->computeAllTendencies(State, AuxState, ThickTimeLevel,
-                                       VelTimeLevel, Time);
+                                       VelTimeLevel, TraceTimeLevel, Time);
 
    // check that everything got computed correctly
    int NCellsOwned    = Mesh->NCellsOwned;

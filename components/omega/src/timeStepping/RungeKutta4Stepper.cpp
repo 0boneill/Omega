@@ -43,7 +43,7 @@ void RungeKutta4Stepper::doStep(OceanState *State, TimeInstant Time) const {
       // R^{(0)} = RHS(q^{n}, t^{n})
       // q^{n+1} = q^{n} + dt * RKB[0] * dt * R^{(0)}
       if (Stage == 0) {
-         Tend->computeAllTendencies(State, AuxState, CurLevel, CurLevel,
+         Tend->computeAllTendencies(State, AuxState, CurLevel, CurLevel, CurLevel,
                                     StageTime);
          updateStateByTend(State, NextLevel, State, CurLevel,
                            RKB[Stage] * TimeStep);
@@ -61,7 +61,7 @@ void RungeKutta4Stepper::doStep(OceanState *State, TimeInstant Time) const {
          }
 
          Tend->computeAllTendencies(ProvisState, AuxState, CurLevel, CurLevel,
-                                    StageTime);
+                                    CurLevel, StageTime);
          updateStateByTend(State, NextLevel, State, NextLevel,
                            RKB[Stage] * TimeStep);
       }

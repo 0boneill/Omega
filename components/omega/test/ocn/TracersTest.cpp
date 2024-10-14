@@ -84,7 +84,7 @@ I4 initTracersTest() {
    }
 
    // Initialize the default time stepper
-   Err = TimeStepper::init();
+   Err = TimeStepper::init1();
    if (Err != 0) {
       LOG_ERROR("Tracers: error initializing default time stepper");
       return Err;

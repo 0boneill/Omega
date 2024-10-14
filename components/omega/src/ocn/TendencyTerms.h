@@ -16,6 +16,7 @@
 #include "MachEnv.h"
 #include "OceanState.h"
 #include "TimeMgr.h"
+#include "Tracers.h"
 
 #include <functional>
 #include <memory>
@@ -282,8 +283,8 @@ class TracerHorzAdvOnCell {
                                    I4 KChunk, const Array2DR8 &NormVelEdge,
                                    const Array3DR8 &HTracersOnEdge) const {
 
-      const I4 KStart  = KChunk * VecLength;
-      Real InvAreaCell = 1._Real / AreaCell(ICell);
+      const I4 KStart        = KChunk * VecLength;
+      const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real HAdvTmp[VecLength] = {0};
 
@@ -325,8 +326,8 @@ class TracerDiffOnCell {
                                    I4 KChunk, const Array3DR8 &TracerCell,
                                    const Array2DR8 &MeanLayerThickEdge) const {
 
-      const I4 KStart  = KChunk * VecLength;
-      Real InvAreaCell = 1. / AreaCell(ICell);
+      const I4 KStart        = KChunk * VecLength;
+      const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real DiffTmp[VecLength] = {0};
 
@@ -378,8 +379,8 @@ class TracerHyperDiffOnCell {
                                    I4 KChunk,
                                    const Array3DR8 &TrDel2Cell) const {
 
-      const I4 KStart  = KChunk * VecLength;
-      Real InvAreaCell = 1. / AreaCell(ICell);
+      const I4 KStart        = KChunk * VecLength;
+      const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real HypTmp[VecLength] = {0};
 
@@ -440,23 +441,24 @@ class Tendencies {
    void computeThicknessTendencies(const OceanState *State,
                                    const AuxiliaryState *AuxState,
                                    int ThickTimeLevel, int VelTimeLevel,
-                                   TimeInstant Time);
+                                   int TraceTimeLevel, TimeInstant Time);
    void computeVelocityTendencies(const OceanState *State,
                                   const AuxiliaryState *AuxState,
                                   int ThickTimeLevel, int VelTimeLevel,
-                                  TimeInstant Time);
+                                  int TraceTimeLevel, TimeInstant Time);
    void computeAllTendencies(const OceanState *State,
                              const AuxiliaryState *AuxState, int ThickTimeLevel,
-                             int VelTimeLevel, TimeInstant Time);
+                             int VelTimeLevel, int TraceTimeLevel,
+                             TimeInstant Time);
 
    void computeThicknessTendenciesOnly(const OceanState *State,
                                        const AuxiliaryState *AuxState,
                                        int ThickTimeLevel, int VelTimeLevel,
-                                       TimeInstant Time);
+                                       int TraceTimeLevel, TimeInstant Time);
    void computeVelocityTendenciesOnly(const OceanState *State,
                                       const AuxiliaryState *AuxState,
                                       int ThickTimeLevel, int VelTimeLevel,
-                                      TimeInstant Time);
+                                      int TraceTimeLevel, TimeInstant Time);
 
    // Create a non-default group of tendencies
    template <class... ArgTypes>
@@ -508,6 +510,7 @@ class Tendencies {
    Tendencies(const std::string &Name, ///< [in] Name for tendencies
               const HorzMesh *Mesh,    ///< [in] Horizontal mesh
               int NVertLevels,         ///< [in] Number of vertical levels
+              int NTracers,            ///< [in] Number of tracers
               Config *Options,         ///< [in] Configuration options
               CustomTendencyType InCustomThicknessTend,
               CustomTendencyType InCustomVelocityTend);
@@ -515,6 +518,7 @@ class Tendencies {
    Tendencies(const std::string &Name, ///< [in] Name for tendencies
               const HorzMesh *Mesh,    ///< [in] Horizontal mesh
               int NVertLevels,         ///< [in] Number of vertical levels
+              int NTracers,            ///< [in] Number of tracers
               Config *Options          ///< [in] Configuration options
    );
 
