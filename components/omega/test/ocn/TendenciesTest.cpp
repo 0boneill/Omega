@@ -39,6 +39,7 @@ struct TestSetup {
 
 constexpr Geometry Geom   = Geometry::Spherical;
 constexpr int NVertLevels = 60;
+constexpr int NTracers    = 5;
 
 int initState() {
    int Err = 0;
@@ -112,6 +113,12 @@ int initTendenciesTest(const std::string &mesh) {
    if (TimeStepperErr != 0) {
       Err++;
       LOG_ERROR("TendenciesTest: error initializing default time stepper");
+   }
+
+   int TracerErr = Tracers::init();
+   if (TracerErr != 0) {
+      Err++;
+      LOG_ERROR("TendenciesTest: error initializing tracer infrastructure");
    }
 
    const auto &Mesh = HorzMesh::getDefault();
@@ -226,6 +233,7 @@ int testTendencies() {
 }
 
 void finalizeTendenciesTest() {
+   Tracers::clear();
    AuxiliaryState::clear();
    OceanState::clear();
    Field::clear();

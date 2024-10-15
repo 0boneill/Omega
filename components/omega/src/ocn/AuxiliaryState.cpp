@@ -16,9 +16,9 @@ AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
                                int NVertLevels, int NTracers)
     : Mesh(Mesh), Name(Name), KineticAux(Name, Mesh, NVertLevels),
       LayerThicknessAux(Name, Mesh, NVertLevels),
-      TracerAux(Name, Mesh, NVertLevels, NTracers),
       VorticityAux(Name, Mesh, NVertLevels),
-      VelocityDel2Aux(Name, Mesh, NVertLevels) {
+      VelocityDel2Aux(Name, Mesh, NVertLevels),
+      TracerAux(Name, Mesh, NVertLevels, NTracers) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {
@@ -159,8 +159,6 @@ int AuxiliaryState::init() {
    const HorzMesh *DefMesh = HorzMesh::getDefault();
 
    int NVertLevels = DefMesh->NVertLevels;
-   // TODO: fetch NTracers
-//   int NTracers = 5;
    int NTracers = Tracers::getNumTracers();
 
    AuxiliaryState::DefaultAuxState =
@@ -224,8 +222,10 @@ int AuxiliaryState::readConfigOptions(Config *OmegaConfig) {
 
    if (FluxThickTypeStr == "Center") {
       this->LayerThicknessAux.FluxThickEdgeChoice = Center;
+      this->TracerAux.TracersOnEdgeChoice         = Center;
    } else if (FluxThickTypeStr == "Upwind") {
       this->LayerThicknessAux.FluxThickEdgeChoice = Upwind;
+      this->TracerAux.TracersOnEdgeChoice         = Upwind;
    } else {
       LOG_CRITICAL("AuxiliaryState: Unknown FluxThicknessType requested");
       Err = -1;

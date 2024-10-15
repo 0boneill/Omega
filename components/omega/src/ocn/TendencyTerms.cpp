@@ -14,6 +14,7 @@
 #include "DataTypes.h"
 #include "HorzMesh.h"
 #include "OceanState.h"
+#include "Tracers.h"
 
 namespace OMEGA {
 
@@ -28,8 +29,6 @@ int Tendencies::init() {
    HorzMesh *DefHorzMesh = HorzMesh::getDefault();
 
    I4 NVertLevels = DefHorzMesh->NVertLevels;
-   // TODO: fetch NTracers
-//   I4 NTracers = 5;
    I4 NTracers = Tracers::getNumTracers();
 
    // Get TendConfig group
@@ -136,10 +135,10 @@ int Tendencies::readTendConfig(Config *TendConfig ///< [in] Tendencies subconfig
       return VelDiffErr;
    }
 
-   I4 ViscDel2 = TendConfig->get("ViscDel2", this->VelocityDiffusion.ViscDel2);
-   if (ViscDel2 != 0 && this->VelocityDiffusion.Enabled) {
+   I4 ViscDel2Err = TendConfig->get("ViscDel2", this->VelocityDiffusion.ViscDel2);
+   if (ViscDel2Err != 0 && this->VelocityDiffusion.Enabled) {
       LOG_CRITICAL("Tendencies: ViscDel2 not found in TendConfig");
-      return ViscDel2;
+      return ViscDel2Err;
    }
 
    I4 VelHyperErr = TendConfig->get("VelHyperDiffTendencyEnable",
@@ -150,10 +149,51 @@ int Tendencies::readTendConfig(Config *TendConfig ///< [in] Tendencies subconfig
       return VelHyperErr;
    }
 
-   I4 ViscDel4 = TendConfig->get("ViscDel4", this->VelocityHyperDiff.ViscDel4);
-   if (ViscDel4 != 0 && this->VelocityHyperDiff.Enabled) {
+   I4 ViscDel4Err = TendConfig->get("ViscDel4", this->VelocityHyperDiff.ViscDel4);
+   if (ViscDel4Err != 0 && this->VelocityHyperDiff.Enabled) {
       LOG_CRITICAL("Tendencies: ViscDel4 not found in TendConfig");
-      return ViscDel4;
+      return ViscDel4Err;
+   }
+
+   I4 TrHAdvErr = TendConfig->get("TracerHorzAdvTendencyEnable",
+                                  this->TracerHorzAdv.Enabled);
+   if (TrHAdvErr !=0) {
+      LOG_CRITICAL("Tendencies: TracerHorzAdvTendencyEnable not found in "
+                   "TendConfig");
+      return TrHAdvErr;
+   }
+
+   I4 TrDiffErr = TendConfig->get("TracerDiffTendencyEnable",
+                                  this->TracerDiffusion.Enabled);
+
+   if (TrDiffErr != 0) {
+      LOG_CRITICAL("Tendencies: TracerDiffTendencyEnable not found in "
+                   "TendConfig");
+      return TrDiffErr;
+   }
+
+   I4 EddyDiff2Err = TendConfig->get("EddyDiff2",
+                                     this->TracerDiffusion.EddyDiff2);
+   if (EddyDiff2Err != 0 && this->TracerDiffusion.Enabled) {
+      LOG_CRITICAL("Tendencies: EddyDiff2 not found in TendConfig");
+      return EddyDiff2Err;
+   }
+
+   I4 TrHyperDiffErr = TendConfig->get("TracerHyperDiffTendencyEnable",
+                                       this->TracerHyperDiff.Enabled);
+
+   if (TrHyperDiffErr != 0) {
+      LOG_CRITICAL("Tendencies: TracerHyperDiffTendencyEnable not found in "
+                   "TendConfig");
+      return TrHyperDiffErr;
+   }
+
+   I4 EddyDiff4Err = TendConfig->get("EddyDiff4",
+                                     this->TracerHyperDiff.EddyDiff4);
+
+   if (EddyDiff4Err != 0 && this->TracerHyperDiff.Enabled) {
+      LOG_CRITICAL("Tendencies: EddyDiff4 not found in TendConfig");
+      return EddyDiff4Err;
    }
 
    return Err;
@@ -170,6 +210,7 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
                        CustomTendencyType InCustomVelocityTend)
     : ThicknessFluxDiv(Mesh), PotientialVortHAdv(Mesh), KEGrad(Mesh),
       SSHGrad(Mesh), VelocityDiffusion(Mesh), VelocityHyperDiff(Mesh),
+      TracerHorzAdv(Mesh), TracerDiffusion(Mesh), TracerHyperDiff(Mesh),
       CustomThicknessTend(InCustomThicknessTend),
       CustomVelocityTend(InCustomVelocityTend) {
 

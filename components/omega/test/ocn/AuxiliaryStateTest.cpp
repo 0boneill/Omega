@@ -12,6 +12,7 @@
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "TimeStepper.h"
+#include "Tracers.h"
 #include "mpi.h"
 
 #include <cmath>
@@ -34,6 +35,10 @@ struct TestSetup {
       return -4 * Radius * std::sin(Lon) * std::cos(Lon) *
              std::pow(std::cos(Lat), 3) * std::sin(Lat);
    }
+
+   KOKKOS_FUNCTION Real tracer(Real Lon, Real Lat) const {
+      return (2 - std::cos(Lon) * std::pow(std::cos(Lat), 4));
+   }
 };
 
 constexpr Geometry Geom   = Geometry::Spherical;
@@ -49,10 +54,17 @@ int initState() {
 
    const auto &LayerThickCell = State->LayerThickness[0];
    const auto &NormalVelEdge  = State->NormalVelocity[0];
+   Array3DReal TracerArray;
+   Err += Tracers::getAll(TracerArray, 0);
+   const auto &TracersCell = TracerArray;
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
        LayerThickCell, Geom, Mesh, OnCell, NVertLevels);
+
+   Err += setScalar(
+       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracer(X, Y); },
+       TracersCell, Geom, Mesh, OnCell, NVertLevels, NTracers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real Lon, Real Lat) {
@@ -84,6 +96,12 @@ int initAuxStateTest(const std::string &mesh) {
       return Err;
    }
 
+   int TimeStepperErr = TimeStepper::init1();
+   if (TimeStepperErr != 0) {
+      Err++;
+      LOG_ERROR("AuxStateTest: error initializing default time stepper");
+   }
+
    int IOErr = IO::init(DefComm);
    if (IOErr != 0) {
       Err++;
@@ -108,10 +126,10 @@ int initAuxStateTest(const std::string &mesh) {
       LOG_ERROR("AuxStateTest: error initializing default mesh");
    }
 
-   int TimeStepperErr = TimeStepper::init1();
-   if (TimeStepperErr != 0) {
+   int TracerErr = Tracers::init();
+   if (TracerErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default time stepper");
+      LOG_ERROR("AuxStateTest: error initializing tracer infrastructure");
    }
 
    const auto &Mesh = HorzMesh::getDefault();
@@ -187,6 +205,9 @@ int testAuxState() {
    deepCopy(DefAuxState->VelocityDel2Aux.Del2DivCell, NAN);
    deepCopy(DefAuxState->VelocityDel2Aux.Del2RelVortVertex, NAN);
 
+   deepCopy(DefAuxState->TracerAux.HTracersOnEdge, NAN);
+   deepCopy(DefAuxState->TracerAux.Del2TracersOnCell, NAN);
+
    // compute auxiliary variables
    const auto *State = OceanState::getDefault();
    DefAuxState->computeAll(State, 0);
@@ -259,12 +280,27 @@ int testAuxState() {
       LOG_ERROR("AuxStateTest: NormPlanetVortEdge FAIL");
    }
 
+   const Real HTracersESum = 
+       sum(DefAuxState->TracerAux.HTracersOnEdge, NTracers, NEdgesOwned);
+   if (!Kokkos::isfinite(HTracersESum)) {
+      Err++;
+      LOG_ERROR("AuxStateTest: HTracersOnEdge FAIL");
+   }
+
+   const Real Del2TracersCSum = 
+       sum(DefAuxState->TracerAux.Del2TracersOnCell, NTracers, NCellsOwned);
+   if (!Kokkos::isfinite(Del2TracersCSum)) {
+      Err++;
+      LOG_ERROR("AuxStateTest: Del2TracersOnCell FAIL");
+   }
+
    AuxiliaryState::clear();
 
    return Err;
 }
 
 void finalizeAuxStateTest() {
+   Tracers::clear();
    OceanState::clear();
    Field::clear();
    Dimension::clear();
