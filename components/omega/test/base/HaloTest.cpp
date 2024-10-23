@@ -93,6 +93,64 @@ void haloExchangeTest(
 
 } // end haloExchangeTest
 
+template <typename T>
+void haloDExchangeTest(
+    OMEGA::HaloD *MyHalo,
+    T InitArray,  /// Array initialized based on global IDs of mesh elements
+    T &TestArray, /// Array only initialized in owned elements
+    const char *Label,                          /// Unique label for test
+    OMEGA::I4 &TotErr,                          /// Integer to track errors
+    OMEGA::MeshElement ThisElem = OMEGA::OnCell /// index space, cell by default
+) {
+
+   OMEGA::I4 IErr{0}; // error code
+
+   // Set total array size and ensure arrays are of same size
+   OMEGA::I4 NTot = InitArray.size();
+   if (NTot != TestArray.size()) {
+      LOG_ERROR("HaloTest: {} arrays must be of same size", Label);
+      LOG_INFO("HaloTest: {} exchange test FAIL", Label);
+      TotErr += -1;
+      return;
+   }
+
+   // Perform halo exchange
+   IErr = MyHalo->exchangeFullArrayHalo(TestArray, ThisElem);
+   if (IErr != 0) {
+      LOG_ERROR("HaloTest: Error during {} halo exchange", Label);
+      LOG_INFO("HaloTest: {} exchange test FAIL", Label);
+      TotErr += -1;
+      return;
+   }
+
+   // Collapse arrays to 1D for easy iteration
+   Kokkos::View<typename T::value_type *, typename T::array_layout,
+                typename T::memory_space>
+       CollapsedInit(InitArray.data(), InitArray.size());
+   Kokkos::View<typename T::value_type *, typename T::array_layout,
+                typename T::memory_space>
+       CollapsedTest(TestArray.data(), TestArray.size());
+
+   // Confirm all elements are identical, if not set error code
+   // and break out of loop
+   for (int N = 0; N < NTot; ++N) {
+      if (CollapsedInit(N) != CollapsedTest(N)) {
+         IErr = -1;
+         break;
+      }
+   }
+
+   if (IErr == 0) {
+      LOG_INFO("HaloTest: {} exchange test PASS", Label);
+   } else {
+      LOG_INFO("HaloTest: {} exchange test FAIL", Label);
+      TotErr += -1;
+   }
+
+   return;
+
+} // end haloExchangeTest
+
 //------------------------------------------------------------------------------
 // Initialization routine for Halo tests. Calls all the init routines needed
 // to create the default Halo.
@@ -133,6 +191,11 @@ int initHaloTest() {
    if (IErr != 0)
       LOG_ERROR("HaloTest: error initializing default halo");
 
+   // Initialize the default halo
+   IErr = OMEGA::HaloD::init();
+   if (IErr != 0)
+      LOG_ERROR("HaloTest: error initializing default halo");
+
    return IErr;
 
 } // end initHaloTest
@@ -164,6 +227,7 @@ int main(int argc, char *argv[]) {
 
       // Retrieve pointer to default halo
       OMEGA::Halo *DefHalo = OMEGA::Halo::getDefault();
+      OMEGA::HaloD *DefHaloD = OMEGA::HaloD::getDefault();
 
       // Retrieve pointer to default decomposition
       OMEGA::Decomp *DefDecomp = OMEGA::Decomp::getDefault();
@@ -270,6 +334,9 @@ int main(int argc, char *argv[]) {
       OMEGA::HostArray5DR4 Test5DR4("Test5DR4", N5, N4, N3, NumAll, N2);
       OMEGA::HostArray5DR8 Test5DR8("Test5DR8", N5, N4, N3, NumAll, N2);
 
+      OMEGA::Array2DR8 InitD2DR8("Test2DR8", NumAll, N2);
+      OMEGA::Array2DR8 TestD2DR8("Test2DR8", NumAll, N2);
+
       // Initialize and run remaining 1D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {
          OMEGA::I4 NewVal = DefDecomp->CellIDH(ICell);
@@ -307,6 +374,7 @@ int main(int argc, char *argv[]) {
       OMEGA::deepCopy(Test2DI8, Init2DI8);
       OMEGA::deepCopy(Test2DR4, Init2DR4);
       OMEGA::deepCopy(Test2DR8, Init2DR8);
+      OMEGA::deepCopy(InitD2DR8, Init2DR8);
 
       for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
          for (int J = 0; J < N2; ++J) {
@@ -316,11 +384,14 @@ int main(int argc, char *argv[]) {
             Test2DR8(ICell, J) = -1;
          }
       }
+      OMEGA::deepCopy(TestD2DR8, Test2DR8);
 
       haloExchangeTest(DefHalo, Init2DI4, Test2DI4, "2DI4", TotErr);
       haloExchangeTest(DefHalo, Init2DI8, Test2DI8, "2DI8", TotErr);
       haloExchangeTest(DefHalo, Init2DR4, Test2DR4, "2DR4", TotErr);
       haloExchangeTest(DefHalo, Init2DR8, Test2DR8, "2DR8", TotErr);
+
+      haloDExchangeTest(DefHaloD, InitD2DR8, TestD2DR8, "D2DR8", TotErr);
 
       // Initialize and run 3D tests
       for (int K = 0; K < N3; ++K) {
