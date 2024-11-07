@@ -183,42 +183,43 @@ struct TestSetupSphere {
    }
 
    KOKKOS_FUNCTION Real velocityX(Real Lon, Real Lat) const {
-      return -Radius * std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+      return -std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
    }
 
    KOKKOS_FUNCTION Real velocityY(Real Lon, Real Lat) const {
-      return -4 * Radius * std::sin(Lon) * std::cos(Lon) *
-             std::pow(std::cos(Lat), 3) * std::sin(Lat);
+      return -4 * std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 3) *
+             std::sin(Lat);
    }
 
    KOKKOS_FUNCTION Real relativeVorticity(Real Lon, Real Lat) const {
       return -4 * std::pow(std::cos(Lon), 2) * std::pow(std::cos(Lat), 2) *
-             std::sin(Lat);
+             std::sin(Lat) / Radius;
    }
 
    KOKKOS_FUNCTION Real divergence(Real Lon, Real Lat) const {
       return std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 2) *
-             (20 * std::pow(std::sin(Lat), 2) - 6);
+             (20 * std::pow(std::sin(Lat), 2) - 6) / Radius;
    }
 
    KOKKOS_FUNCTION Real velocityDel2X(Real Lon, Real Lat) const {
-      return 1 / Radius *
+      return 1 / (Radius * Radius) *
                  (std::pow(std::cos(Lon), 2) - std::pow(std::sin(Lon), 2)) *
                  std::cos(Lat) * (20 * std::pow(std::sin(Lat), 2) - 6) +
-             4 / Radius * std::pow(cos(Lon), 2) *
+             4 / (Radius * Radius) * std::pow(cos(Lon), 2) *
                  (std::pow(cos(Lat), 3) -
                   2 * std::cos(Lat) * std::pow(sin(Lat), 2));
    }
 
    KOKKOS_FUNCTION Real velocityDel2Y(Real Lon, Real Lat) const {
-      return 1 / Radius * std::sin(Lon) * std::cos(Lon) * std::sin(Lat) *
-                 std::cos(Lat) * (80 * std::pow(std::cos(Lat), 2) - 28) +
-             8 / Radius * std::sin(Lon) * std::cos(Lon) * std::sin(Lat) *
-                 std::cos(Lat);
+      return 1 / (Radius * Radius) * std::sin(Lon) * std::cos(Lon) *
+                 std::sin(Lat) * std::cos(Lat) *
+                 (80 * std::pow(std::cos(Lat), 2) - 28) +
+             8 / (Radius * Radius) * std::sin(Lon) * std::cos(Lon) *
+                 std::sin(Lat) * std::cos(Lat);
    }
 
    KOKKOS_FUNCTION Real velocityDel2Div(Real Lon, Real Lat) const {
-      return 1 / (Radius * Radius) *
+      return 1 / (Radius * Radius * Radius) *
              (-2 * std::sin(Lon) * std::cos(Lon) *
                   (28 * std::pow(sin(Lat), 2) - 8) +
               std::sin(Lon) * std::cos(Lon) *
@@ -228,7 +229,7 @@ struct TestSetupSphere {
    }
 
    KOKKOS_FUNCTION Real velocityDel2Curl(Real Lon, Real Lat) const {
-      return 1 / (Radius * Radius) *
+      return 1 / (Radius * Radius * Radius) *
              (-std::sin(Lat) * (std::pow(std::cos(Lat), 2) *
                                     (56 * std::pow(cos(Lon), 2) - 40) -
                                 2 * (std::pow(cos(Lon), 2) *
@@ -408,7 +409,7 @@ int testLayerThicknessAuxVars(const Array2DReal &LayerThickCell,
    // Compute numerical result
 
    LayerThicknessAuxVars LayerThicknessAux("", Mesh, NVertLevels);
-   LayerThicknessAux.FluxThickEdgeChoice = Upwind;
+   LayerThicknessAux.FluxThickEdgeChoice = FluxThickEdgeOption::Upwind;
    parallelFor(
        {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
           LayerThicknessAux.computeVarsOnEdge(IEdge, KLevel, LayerThickCell,
@@ -679,7 +680,7 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
    const auto Mesh = HorzMesh::getDefault();
 
    TracerAuxVars TracerAux("", Mesh, NVertLevels, NTracers);
-   TracerAux.TracersOnEdgeChoice = Upwind;
+   TracerAux.TracersOnEdgeChoice = FluxTracerEdgeOption::Upwind;
 
    // Set input arrays
 
@@ -694,16 +695,16 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
        LayerThickEdge, Geom, Mesh, OnEdge, NVertLevels);
 
-   // Compute exact HTracerOnEdge
+   // Compute exact HTracerEdge
 
-   Array3DReal ExactHTrOnEdge("ExactHTrOnEdge", NTracers, Mesh->NEdgesOwned,
-                              NVertLevels);
+   Array3DReal ExactHTrEdge("ExactHTrEdge", NTracers, Mesh->NEdgesOwned,
+                            NVertLevels);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.thickTracer(X, Y); },
-       ExactHTrOnEdge, Geom, Mesh, OnEdge, NVertLevels, NTracers,
+       ExactHTrEdge, Geom, Mesh, OnEdge, NVertLevels, NTracers,
        ExchangeHalos::No);
 
-   // Compute numerical HTracersOnEdge
+   // Compute numerical HTracersEdge
 
    parallelFor(
        {NTracers, Mesh->NEdgesOwned, NVertLevels},
@@ -712,26 +713,26 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
                                       LayerThickCell, TracersOnCell);
        });
 
-   // Compute error measures and check errors for HTracersOnEdge
+   // Compute error measures and check errors for HTracersEdge
 
-   const auto &NumHTrOnEdge = TracerAux.HTracersOnEdge;
+   const auto &NumHTrEdge = TracerAux.HTracersEdge;
 
    ErrorMeasures HTracerErrors;
-   Err += computeErrors(HTracerErrors, NumHTrOnEdge, ExactHTrOnEdge, Mesh,
-                        OnEdge, NVertLevels, NTracers);
+   Err += computeErrors(HTracerErrors, NumHTrEdge, ExactHTrEdge, Mesh, OnEdge,
+                        NVertLevels, NTracers);
    Err += checkErrors("AuxVarsTest", "HTracers", HTracerErrors,
                       Setup.ExpectedHTracerErrors, RTol);
 
-   // Compute exact Del2TracerOnCell
+   // Compute exact Del2TracerCell
 
-   Array3DReal ExactDel2TrOnCell("ExactDel2TrOnCell", NTracers,
-                                 Mesh->NCellsOwned, NVertLevels);
+   Array3DReal ExactDel2TrCell("ExactDel2TrCell", NTracers, Mesh->NCellsOwned,
+                               NVertLevels);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.del2Tracer(X, Y); },
-       ExactDel2TrOnCell, Geom, Mesh, OnCell, NVertLevels, NTracers,
+       ExactDel2TrCell, Geom, Mesh, OnCell, NVertLevels, NTracers,
        ExchangeHalos::No);
 
-   // Compute numerical Del2TracerOnCell
+   // Compute numerical Del2TracerCell
 
    parallelFor(
        {NTracers, Mesh->NCellsOwned, NVertLevels},
@@ -740,13 +741,13 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
                                        TracersOnCell);
        });
 
-   // Compute error measures and check errors for Del2TracersOnCell
+   // Compute error measures and check errors for Del2TracersCell
 
-   const auto &NumDel2TrOnCell = TracerAux.Del2TracersOnCell;
+   const auto &NumDel2TrCell = TracerAux.Del2TracersCell;
 
    ErrorMeasures Del2TracerErrors;
-   Err += computeErrors(Del2TracerErrors, NumDel2TrOnCell, ExactDel2TrOnCell,
-                        Mesh, OnCell, NVertLevels, NTracers);
+   Err += computeErrors(Del2TracerErrors, NumDel2TrCell, ExactDel2TrCell, Mesh,
+                        OnCell, NVertLevels, NTracers);
    Err += checkErrors("AuxVarsTest", "Del2Tracers", Del2TracerErrors,
                       Setup.ExpectedDel2TracerErrors, RTol);
 

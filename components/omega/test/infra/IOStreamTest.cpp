@@ -10,6 +10,7 @@
 //===-----------------------------------------------------------------------===/
 
 #include "IOStream.h"
+#include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
 #include "Dimension.h"
@@ -23,6 +24,8 @@
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 #include "mpi.h"
+#include <chrono>
+#include <thread>
 #include <vector>
 
 using namespace OMEGA;
@@ -49,23 +52,24 @@ void TestEval(const std::string &TestName, T TestVal, T ExpectVal, int &Error) {
 }
 //------------------------------------------------------------------------------
 // Initialization routine to create reference Fields
-int initIOStreamTest(std::shared_ptr<Clock> &ModelClock, // Model clock
-                     Calendar &ModelCalendar) {
+int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
+) {
 
    int Err    = 0;
    int Err1   = 0;
    int ErrRef = 0;
 
-   // Initialize maching environment and logging
+   // Initialize machine environment and logging
    MachEnv::init(MPI_COMM_WORLD);
    MachEnv *DefEnv  = MachEnv::getDefault();
    MPI_Comm DefComm = DefEnv->getComm();
    initLogging(DefEnv);
 
    // Read the model configuration
-   Config Config("omega");
+   Config("Omega");
    Err1 = Config::readAll("omega.yml");
    TestEval("Config read all", Err1, ErrRef, Err);
+   Config *OmegaConfig = Config::getOmegaConfig();
 
    // Initialize base-level IO
    Err1 = IO::init(DefComm);
@@ -84,7 +88,23 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock, // Model clock
    TestEval("IO Field initialization", Err1, ErrRef, Err);
 
    // Create the model clock and time step
-   TimeInstant SimStartTime(&ModelCalendar, 0001, 1, 1, 0, 0, 0.0);
+   // Get Calendar from time management config group
+   Config TimeMgmtConfig("TimeManagement");
+   Err = OmegaConfig->get(TimeMgmtConfig);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: TimeManagement group not found in Config");
+      return Err;
+   }
+   std::string ConfigCalStr;
+   Err = TimeMgmtConfig.get("CalendarType", ConfigCalStr);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: CalendarType not found in TimeMgmtConfig");
+      return Err;
+   }
+   Calendar::init(ConfigCalStr);
+
+   // Use internal start time and time step rather than Config
+   TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
    TimeInterval TimeStep(2, TimeUnits::Hours);
    ModelClock = std::make_shared<Clock>(SimStartTime, TimeStep);
 
@@ -104,7 +124,7 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock, // Model clock
        Dimension::create("NVertLevels", NVertLevels);
 
    // Initialize time stepper needed before ocean state (for time levels)
-   Err1 = TimeStepper::init();
+   Err1 = TimeStepper::init1();
    TestEval("Ocean time step initialization", Err1, ErrRef, Err);
 
    // Initialize State
@@ -190,11 +210,10 @@ int main(int argc, char **argv) {
    Kokkos::initialize();
    {
 
-      Calendar CalGreg("Gregorian", OMEGA::CalendarGregorian);
-      std::shared_ptr<Clock> ModelClock;
+      std::shared_ptr<Clock> ModelClock = nullptr;
 
       // Call initialization to create reference IO field
-      Err1 = initIOStreamTest(ModelClock, CalGreg);
+      Err1 = initIOStreamTest(ModelClock);
       TestEval("Initialize IOStream test", Err1, ErrRef, Err);
 
       // Retrieve dimension lengths and some mesh info
@@ -235,7 +254,7 @@ int main(int argc, char **argv) {
           });
 
       // Create a stop alarm at 1 year for time stepping
-      TimeInstant StopTime(&CalGreg, 0002, 1, 1, 0, 0, 0.0);
+      TimeInstant StopTime(0002, 1, 1, 0, 0, 0.0);
       Alarm StopAlarm("Stop Time", StopTime);
       Err1 = ModelClock->attachAlarm(&StopAlarm);
       TestEval("Attach stop alarm", Err1, ErrRef, Err);
@@ -253,9 +272,9 @@ int main(int argc, char **argv) {
       }
 
       // Force read the latest restart and check the results
-      // We use this log message to act as a barrier/delay to make sure the
-      // restart write has finished before we read.
-      LOG_INFO("Test reading final restart");
+      // A delay is needed here to make sure the restart file is completely
+      // written before we read.
+      std::this_thread::sleep_for(std::chrono::seconds(5));
       bool ForceRead = true;
       Err1 = IOStream::read("RestartRead", *ModelClock, ReqMetadata, ForceRead);
       TestEval("Restart force read", Err1, ErrRef, Err);
@@ -277,6 +296,7 @@ int main(int argc, char **argv) {
    }
 
    // Clean up environments
+   TimeStepper::clear();
    OceanState::clear();
    HorzMesh::clear();
    Field::clear();

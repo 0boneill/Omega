@@ -22,13 +22,13 @@
 #include "TendencyTerms.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
+#include "Tracers.h"
 
 #include "mpi.h"
 
 namespace OMEGA {
 
 int ocnInit(MPI_Comm Comm,          ///< [in] ocean MPI communicator
-            Calendar &OmegaCal,     ///< [out] sim calendar
             TimeInstant &StartTime, ///< [out] sim start time
             Alarm &EndAlarm         ///< [out] alarm to end simulation
 ) {
@@ -52,7 +52,7 @@ int ocnInit(MPI_Comm Comm,          ///< [in] ocean MPI communicator
    Config *OmegaConfig = Config::getOmegaConfig();
 
    // read and save time management options from Config
-   Err = initTimeManagement(OmegaCal, StartTime, EndAlarm, OmegaConfig);
+   Err = initTimeManagement(StartTime, EndAlarm, OmegaConfig);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing time management");
       return Err;
@@ -69,8 +69,8 @@ int ocnInit(MPI_Comm Comm,          ///< [in] ocean MPI communicator
 } // end ocnInit
 
 // Read time management options from config
-int initTimeManagement(Calendar &OmegaCal, TimeInstant &StartTime,
-                       Alarm &EndAlarm, Config *OmegaConfig) {
+int initTimeManagement(TimeInstant &StartTime, Alarm &EndAlarm,
+                       Config *OmegaConfig) {
 
    // error code
    I4 Err = 0;
@@ -86,31 +86,14 @@ int initTimeManagement(Calendar &OmegaCal, TimeInstant &StartTime,
       return Err;
    }
 
-   // check requested calendar is a valid option, return error if not found
+   // Set model calendar
    std::string ConfigCalStr;
    Err = TimeMgmtConfig.get("CalendarType", ConfigCalStr);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: CalendarType not found in TimeMgmtConfig");
       return Err;
    }
-   CalendarKind ConfigCalKind = CalendarUnknown;
-   I4 ICalType                = CalendarUnknown;
-   for (I4 I = 0; I < NUM_SUPPORTED_CALENDARS; ++I) {
-      if (ConfigCalStr == CalendarKindName[I]) {
-         ICalType      = I;
-         ConfigCalKind = (CalendarKind)(ICalType + 1);
-         break;
-      }
-   }
-   if (ICalType == CalendarUnknown) {
-      LOG_CRITICAL("ocnInit: Requested Calendar type not found");
-      Err = -1;
-      return Err;
-   }
-   // destroy default Calendar to keep static NumCalendars member
-   // accurate, then construct requested Calendar
-   OmegaCal.~Calendar();
-   OmegaCal = Calendar(ConfigCalStr, ConfigCalKind);
+   Calendar::init(ConfigCalStr);
 
    // retrieve start time from config
    std::string StartTimeStr;
@@ -119,7 +102,7 @@ int initTimeManagement(Calendar &OmegaCal, TimeInstant &StartTime,
       LOG_CRITICAL("ocnInit: StartTime not found in TimeMgmtConfig");
       return Err;
    }
-   StartTime = TimeInstant(&OmegaCal, StartTimeStr);
+   StartTime = TimeInstant(StartTimeStr);
 
    std::string NoneStr("none");
 
@@ -130,7 +113,7 @@ int initTimeManagement(Calendar &OmegaCal, TimeInstant &StartTime,
    if (Err1 != 0) {
       LOG_WARN("ocnInit: StopTime not found in TimeMgmtConfig");
    } else if (StopTimeStr != NoneStr) {
-      TimeInstant StopTime(&OmegaCal, StopTimeStr);
+      TimeInstant StopTime(StopTimeStr);
       RunInterval = StopTime - StartTime;
    }
    std::string RunDurationStr;
@@ -169,6 +152,12 @@ int initOmegaModules(MPI_Comm Comm) {
    I4 Err = 0;
 
    // initialize all necessary Omega modules
+   Err = TimeStepper::init1();
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Error phase 1 initializing default time stepper");
+      return Err;
+   }
+
    Err = IO::init(Comm);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing parallel IO");
@@ -199,6 +188,12 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
+   Err = Tracers::init();
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Error initializing tracers infrastructure");
+      return Err;
+   }
+
    Err = AuxiliaryState::init();
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing default aux state");
@@ -211,9 +206,9 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
-   Err = TimeStepper::init();
+   Err = TimeStepper::init2();
    if (Err != 0) {
-      LOG_CRITICAL("ocnInit: Error initializing default time stepper");
+      LOG_CRITICAL("ocnInit: Error phase 2 initializing default time stepper");
       return Err;
    }
 
