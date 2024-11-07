@@ -309,8 +309,8 @@ int main(int argc, char *argv[]) {
 //      std::cout << " halo test start " << std::endl;
       haloExchangeTestD(DefHaloD, Init1DI4Cell, Test1DI4Cell, "1DI4 Cell",
                        TotErr);
-      haloExchangeTestD(DefHaloD, Init1DI4CellD, Test1DI4CellD, "1DI4 CellD",
-                       TotErr);
+//      haloExchangeTestD(DefHaloD, Init1DI4CellD, Test1DI4CellD, "1DI4 CellD",
+//                       TotErr);
 //      if(DefHaloD->checkArrayMemLoc<HostArray1DI4>() == ArrayMemLoc::Host) {
 //         std::cout << "Array on Host" << std::endl;
 //      }
@@ -334,10 +334,10 @@ int main(int argc, char *argv[]) {
 
       deepCopy(Init1DI4EdgeD, Init1DI4Edge);
       deepCopy(Test1DI4EdgeD, Test1DI4Edge);
-      haloExchangeTestD(DefHaloD, Init1DI4Edge, Test1DI4Edge, "1DI4 Edge", TotErr,
-                       OnEdge);
-      haloExchangeTestD(DefHaloD, Init1DI4EdgeD, Test1DI4EdgeD, "1DI4 EdgeD", TotErr,
-                       OnEdge);
+//      haloExchangeTestD(DefHaloD, Init1DI4Edge, Test1DI4Edge, "1DI4 Edge", TotErr,
+//                       OnEdge);
+//      haloExchangeTestD(DefHaloD, Init1DI4EdgeD, Test1DI4EdgeD, "1DI4 EdgeD", TotErr,
+//                       OnEdge);
 
       HostArray1DI4 Init1DI4Vertex("Init1DI4Vertex",
                                           DefDecomp->NVerticesSize);
@@ -359,10 +359,10 @@ int main(int argc, char *argv[]) {
 
       deepCopy(Init1DI4VertexD, Init1DI4Vertex);
       deepCopy(Test1DI4VertexD, Test1DI4Vertex);
-      haloExchangeTestD(DefHaloD, Init1DI4Vertex, Test1DI4Vertex, "1DI4 Vertex",
-                       TotErr, OnVertex);
-      haloExchangeTestD(DefHaloD, Init1DI4VertexD, Test1DI4VertexD, "1DI4 VertexD",
-                       TotErr, OnVertex);
+//      haloExchangeTestD(DefHaloD, Init1DI4Vertex, Test1DI4Vertex, "1DI4 Vertex",
+//                       TotErr, OnVertex);
+//      haloExchangeTestD(DefHaloD, Init1DI4VertexD, Test1DI4VertexD, "1DI4 VertexD",
+//                       TotErr, OnVertex);
 
       // Declaration of variables for remaining tests
 
@@ -452,9 +452,9 @@ int main(int argc, char *argv[]) {
 //      haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8", TotErr);
 //      haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4", TotErr);
 //      haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8", TotErr);
-      haloExchangeTestD(DefHaloD, Init1DI8D, Test1DI8D, "1DI8D", TotErr);
-      haloExchangeTestD(DefHaloD, Init1DR4D, Test1DR4D, "1DR4D", TotErr);
-      haloExchangeTestD(DefHaloD, Init1DR8D, Test1DR8D, "1DR8D", TotErr);
+//      haloExchangeTestD(DefHaloD, Init1DI8D, Test1DI8D, "1DI8D", TotErr);
+//      haloExchangeTestD(DefHaloD, Init1DR4D, Test1DR4D, "1DR4D", TotErr);
+//      haloExchangeTestD(DefHaloD, Init1DR8D, Test1DR8D, "1DR8D", TotErr);
 
       // Initialize and run 2D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {

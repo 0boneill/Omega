@@ -644,6 +644,8 @@ class HaloD {
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[MyElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
 
+//      std::cout << LocNeighbor.TaskID << " " << LocList.NTot << std::endl;
+
 //      const auto &LocArray = Array;
 //      const auto &LocIndex = LocList.Index;
 
@@ -668,7 +670,23 @@ class HaloD {
       }
    }
 
-//      Kokkos::fence();
+//   Kokkos::fence();
+
+//   OMEGA_SCOPE(IDList, MyDecomp->CellIDH);
+//
+//   FILE *fptr;
+//   char filename[32];
+//   sprintf(filename, "out%d_%d.dat", MyTask, LocNeighbor.TaskID);
+//   fptr = fopen(filename, "w");
+//
+////   for (int I = 0; I < LocList.NTot; ++I) {
+//   for(int IHalo = 0; IHalo < NumLayers; ++IHalo) {
+//      for (int IList = 0; IList < LocList.NList[IHalo]; ++IList) {
+//         int IBuff = LocList.Offsets[IHalo] + IList;
+//      fprintf(fptr, "%8d %8d %8d %8d\n", IBuff, LocList.IndexH(IBuff), LocList.Ind[IHalo][IList], IDList(LocList.IndexH(IBuff)));
+//      }
+//   }
+//   fclose(fptr);
 
       return Err;
    }
@@ -737,6 +755,28 @@ class HaloD {
                reinterpret_cast<ValType &>(LocBuffH(IExch));
          }
       }
+
+//      Kokkos::fence();
+
+//   OMEGA_SCOPE(IDList, MyDecomp->CellIDH);
+//
+//   std::cout << "unpack " << MyTask << " " << LocNeighbor.TaskID << " " 
+//             << "NLayers " << NumLayers << "NList " << LocList.NList[0] << " " 
+//             <<LocList.NList[1] << " " << LocList.NList[2] << std::endl;
+//
+//   FILE *fptr;
+//   char filename[32];
+//   sprintf(filename, "unp%d_%d.dat", MyTask, LocNeighbor.TaskID);
+//   fptr = fopen(filename, "w");
+//
+////   for (int I = 0; I < LocList.NTot; ++I) {
+//   for(int IHalo = 0; IHalo < NumLayers; ++IHalo) {
+//      for (int IList = 0; IList < LocList.NList[IHalo]; ++IList) {
+//         int IBuff = LocList.Offsets[IHalo] + IList;
+//      fprintf(fptr, "%8d %8d %8d %8d\n", IBuff, LocList.IndexH(IBuff), LocList.Ind[IHalo][IList], IDList(LocList.IndexH(IBuff)));
+//      }
+//   }
+//   fclose(fptr);
 
       return Err;
    }
@@ -841,6 +881,8 @@ class HaloD {
       // neighboring task
       startReceives();
 
+      MPI_Barrier(MyComm);
+
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
@@ -853,11 +895,14 @@ class HaloD {
             packBuff(Array);
          }
       }
-      Kokkos::fence();
+
+//      Kokkos::fence();
 //      std::cout << " #1 " << std::endl;
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
       startSends();
+
+      MPI_Barrier(MyComm);
 
       // Wait for all sends to complete before proceeding
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
@@ -882,6 +927,7 @@ class HaloD {
       while (not AllReceived) {
          for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
             if (RecvFlags[MyElem][INghbr]) {
+               CurNeighbor = INghbr;
                MyNeighbor = &Neighbors[INghbr];
                if (not MyNeighbor->Received) {
                   MPI_Test(&MyNeighbor->RReq, &MyNeighbor->Received,
@@ -908,7 +954,8 @@ class HaloD {
             break;
          }
       }
-      Kokkos::fence();
+
+//      Kokkos::fence();
 //      std::cout << " #3 " << std::endl;
 
       return IErr;
