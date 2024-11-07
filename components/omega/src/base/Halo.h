@@ -23,9 +23,13 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "mpi.h"
+#include "OmegaKokkos.h"
 #include <memory>
 #include <numeric>
+#include <vector>
+#include <type_traits>
 
+#include <iostream>
 namespace OMEGA {
 
 using MPIArray1DI4   = Array1DI4;
@@ -65,6 +69,9 @@ static const MPI_Datatype MPI_RealKind = MPI_DOUBLE;
 
 /// The meshElement enum identifies the index space to use for a halo exchange.
 enum MeshElement { OnCell, OnEdge, OnVertex };
+
+enum class ArrayMemLoc { Unknown, Device, Host, Both };
+
 
 /// The Halo class contains two nested classes, ExchList and Neighbor classes,
 /// defined below. The Halo class holds all the Neighbor objects needed by a
@@ -434,7 +441,20 @@ class Halo {
 /// temporary variables utilized by the current halo exchange which are stored
 /// here for easy accesibility by the Halo methods.
 class HaloD {
- private:
+ public:
+
+   template<class T> ArrayMemLoc checkArrayMemLoc() {
+      if (std::is_same_v<MemSpace, HostMemSpace>) {
+         return ArrayMemLoc::Both;
+      } else if (T::is_hostspace) {
+         return ArrayMemLoc::Host;
+      } else {
+         return ArrayMemLoc::Device;
+      }
+   }
+
+   ArrayMemLoc CurMemSpace = ArrayMemLoc::Unknown;
+
    /// The default Halo handles halo exchanges for arrays defined on the mesh
    /// with the default decomposition. A pointer is stored here for easy
    /// retrieval.
@@ -475,22 +495,33 @@ class HaloD {
    /// Pointer to current neighbor, utilized in the various member functions
    /// to make code more concise.
    NeighborD *MyNeighbor{nullptr};
+   I4 CurNeighbor;
 
    /// The ExchList class contains the information needed to pack values from
    /// an array into a buffer or unpack values from a buffer into an array
    /// for a particular index space and neighbor
    class ExchListD {
-    private:
+    public:
       /// Array containing number of mesh elements in each halo layer
       std::vector<I4> NList;
+      std::vector<I4> NHalo;
+      HostArray1DI4 NLstH;
       /// Total number of elements in ExchList, sum of NList
       I4 NTot;
       /// Array containing starting indices in the buffer for each halo layer
       std::vector<I4> Offsets;
+      HostArray1DI4 OffsH;
+      Array1DI4 Offs;
+
       /// 2D vector containing for each halo layer the list of local
       /// indices of elements to be packed into the send buffer, or the local
       /// indices of elements unpacked from the receive buffer
       std::vector<std::vector<I4>> Ind;
+      std::vector<HostArray1DI4> IdxH;
+      std::vector<Array1DI4> Idx;      
+
+      Array1DI4 Index;
+      HostArray1DI4 IndexH;
 
       /// The constructor for the ExchList class takes as input an array of
       /// vectors, each containing a list of indices to be sent or received for
@@ -502,17 +533,19 @@ class HaloD {
       /// uninitialized ExchList objects
       ExchListD();
 
+   /// Destructor
+   ~ExchListD() {}
       /// Halo and Neighbor are friend class to allow access to private
       /// members of the class
-      friend class HaloD;
-      friend class NeighborD;
+//      friend class HaloD;
+//      friend class NeighborD;
    }; // end class ExchList
 
    /// The Neighbor class contains all the information and buffer memory
    /// needed to carry out a halo exchange in each index space for one
    /// neighboring task.
    class NeighborD {
-    private:
+    public:
       I4 TaskID; /// ID of neighboring task
 
       /// Arrays of ExchList objects for sends and recieves for each
@@ -520,6 +553,8 @@ class HaloD {
       ExchListD SendLists[3], RecvLists[3];
       /// Buffers for MPI communication
       std::vector<Real> SendBuffer, RecvBuffer;
+      HostArray1DR8 SendBuffH, RecvBuffH;
+      Array1DR8 SendBuff, RecvBuff;
       /// MPI request handles for non-blocking MPI communication
       MPI_Request RReq, SReq;
 
@@ -540,9 +575,13 @@ class HaloD {
                const std::vector<std::vector<I4>> &RecvEdge,
                const std::vector<std::vector<I4>> &RecvVert, const I4 NghbrID);
 
+
+   /// Destructor
+   ~NeighborD() {}
+
       /// Halo is a friend class to allow access to private members
       /// of the class
-      friend class HaloD;
+//      friend class HaloD;
 
    }; // end class Neighbor
 
@@ -594,8 +633,54 @@ class HaloD {
    /// Buffer pack functions overloaded to each supported Kokkos array type.
    /// Select out the proper elements from the input Array to send to a
    /// neighboring task and pack them into SendBuffer for that Neighbor
-   int packBuffer(const HostArray1DI4 Array);
-   int packBuffer(const HostArray1DI8 Array);
+   int packBuffer(const Array1DI4 &Array);
+   template <typename T>
+   int
+   packBuff(T &Array            // Kokkos array of any type
+   ) {
+      I4 Err = 0;
+
+      OMEGA_SCOPE(LocArray, Array);
+      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[MyElem]);
+      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+
+//      const auto &LocArray = Array;
+//      const auto &LocIndex = LocList.Index;
+
+   if (CurMemSpace == ArrayMemLoc::Device ||
+       CurMemSpace == ArrayMemLoc::Both) { 
+      OMEGA_SCOPE(LocIndex, LocList.Index);
+      Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot);
+      const auto &LocBuff = Neighbors[CurNeighbor].SendBuff;
+      parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+         auto Val = LocArray(LocIndex(IExch));
+         const R8 RVal = reinterpret_cast<R8 &>(Val);
+         LocBuff(IExch) = RVal;
+      });
+   } else {
+      OMEGA_SCOPE(LocIndexH, LocList.IndexH);
+      Kokkos::resize(LocNeighbor.SendBuffH, LocList.NTot);
+      const auto &LocBuffH = Neighbors[CurNeighbor].SendBuffH;
+      for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+         const R8 RVal = reinterpret_cast<R8 &>(
+                        LocArray(LocIndexH(IExch)));
+         LocBuffH(IExch) = RVal;
+      }
+   }
+
+//      Kokkos::fence();
+
+      return Err;
+   }
+//   KOKKOS_FUNCTION
+//   void packBuff(const Array1DR8 &SendBuff, I4 IOffset, I4 IExch,
+//                 const Array1DI4 &Idx,
+//                 const Array1DI4 &Array) const {
+//      const I4 IBuff = IOffset + IExch;
+//      SendBuff(IBuff) = reinterpret_cast<R8 &>(Array(Idx(IExch)));
+//   }
+
+/*   int packBuffer(const HostArray1DI8 Array);
    int packBuffer(const HostArray1DR4 Array);
    int packBuffer(const HostArray1DR8 Array);
    int packBuffer(const HostArray2DI4 Array);
@@ -614,13 +699,48 @@ class HaloD {
    int packBuffer(const HostArray5DI8 Array);
    int packBuffer(const HostArray5DR4 Array);
    int packBuffer(const HostArray5DR8 Array);
-
+*/
    /// Buffer unpack functions overloaded to each supported Kokkos array type.
    /// After receiving a message from a neighboring task, save the elements
    /// of RecvBuffer for that Neighbor into the corresponding halo elements
    /// of the input Array
-   int unpackBuffer(HostArray1DI4 &Array);
-   int unpackBuffer(HostArray1DI8 &Array);
+   int unpackBuffer(Array1DI4 &Array);
+   template <typename T>
+   int
+   unpackBuff(T &Array            // Kokkos array of any type
+   ) {
+      I4 Err = 0;
+
+      using ValType = typename T::non_const_value_type;
+
+      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[MyElem]);
+      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+
+      const auto &LocArray = Array;
+      const auto &LocIndex = LocList.Index;
+
+      if (CurMemSpace == ArrayMemLoc::Device ||
+          CurMemSpace == ArrayMemLoc::Both) { 
+         OMEGA_SCOPE(LocIndex, LocList.Index);
+         const auto &LocBuff = Neighbors[CurNeighbor].RecvBuff;
+         parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+            const I4 IArr = LocIndex(IExch);
+            LocArray(IArr) = 
+               reinterpret_cast<ValType &>(LocBuff(IExch));
+         });
+      } else {
+         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
+         const auto &LocBuffH = Neighbors[CurNeighbor].RecvBuffH;
+         for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+            const I4 IArr = LocIndexH(IExch);
+            LocArray(IArr) = 
+               reinterpret_cast<ValType &>(LocBuffH(IExch));
+         }
+      }
+
+      return Err;
+   }
+/*   int unpackBuffer(HostArray1DI8 &Array);
    int unpackBuffer(HostArray1DR4 &Array);
    int unpackBuffer(HostArray1DR8 &Array);
    int unpackBuffer(HostArray2DI4 &Array);
@@ -639,7 +759,7 @@ class HaloD {
    int unpackBuffer(HostArray5DI8 &Array);
    int unpackBuffer(HostArray5DR4 &Array);
    int unpackBuffer(HostArray5DR8 &Array);
-
+*/
    /// Construct a new halo labeled Name for the input MachEnv and Decomp
    HaloD(const std::string &Name, const MachEnv *InEnv, const Decomp *InDecomp);
 
@@ -647,7 +767,7 @@ class HaloD {
    HaloD(const Halo &) = delete;
    HaloD(Halo &&)      = delete;
 
- public:
+// public:
    // Methods
 
    /// initialize default Halo
@@ -691,6 +811,8 @@ class HaloD {
       // Save the index space the input array is defined on
       MyElem = ThisElem;
 
+      CurMemSpace = checkArrayMemLoc<T>();
+
       // For cell-based quantities, the number of halo layers equals HaloWidth,
       // edge- and vertex-based quantities have an extra layer.
       if (MyElem == OnCell) {
@@ -722,13 +844,17 @@ class HaloD {
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         CurNeighbor          = INghbr;
          MyNeighbor           = &Neighbors[INghbr];
          MyNeighbor->Received = false;
          MyNeighbor->Unpacked = false;
          if (SendFlags[MyElem][INghbr]) {
-            packBuffer(Array);
+//            packBuffer(Array);
+            packBuff(Array);
          }
       }
+      Kokkos::fence();
+//      std::cout << " #1 " << std::endl;
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
       startSends();
@@ -749,6 +875,7 @@ class HaloD {
       I4 NMessages = std::accumulate(RecvFlags[MyElem].begin(),
                                      RecvFlags[MyElem].end(), 0);
 
+//      std::cout << " #2 " << std::endl;
       // Until all messages from neighboring tasks are received, loop
       // through Neighbor objects and use MPI_Test to check if the message
       // has been received. Unpack buffers upon receipt of each message
@@ -764,7 +891,8 @@ class HaloD {
                   }
                }
                if (MyNeighbor->Received and not MyNeighbor->Unpacked) {
-                  unpackBuffer(Array);
+//                  unpackBuffer(Array);
+                  unpackBuff(Array);
                   MyNeighbor->Unpacked = true;
                }
             }
@@ -780,10 +908,11 @@ class HaloD {
             break;
          }
       }
+      Kokkos::fence();
+//      std::cout << " #3 " << std::endl;
 
       return IErr;
    } // end exchangeFullArrayHalo
-
 };
 } // end namespace OMEGA
 
