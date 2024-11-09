@@ -416,9 +416,9 @@ class Halo {
 /// temporary variables utilized by the current halo exchange which are stored
 /// here for easy accesibility by the Halo methods.
 class HaloD {
- public:
+ private:
 
-//   template<class T> ArrayMemLoc checkArrayMemLoc() {
+//   template<class T> ArrayMemLoc findMemLoc() {
 //      if (std::is_same_v<MemSpace, HostMemSpace>) {
 //         return ArrayMemLoc::Both;
 //      } else if (T::is_hostspace) {
@@ -428,10 +428,10 @@ class HaloD {
 //      }
 //   }
 
-//   bool MpiOnDev = true;
-   bool MpiOnDev = false;
+   bool MpiOnDev = true;
+//   bool MpiOnDev = false;
 
-   ArrayMemLoc CurMemSpace = ArrayMemLoc::Unknown;
+//   ArrayMemLoc CurMemSpace = ArrayMemLoc::Unknown;
 
    /// The default Halo handles halo exchanges for arrays defined on the mesh
    /// with the default decomposition. A pointer is stored here for easy
@@ -479,7 +479,7 @@ class HaloD {
    /// an array into a buffer or unpack values from a buffer into an array
    /// for a particular index space and neighbor
    class ExchListD {
-    public:
+    private:
       /// Array containing number of mesh elements in each halo layer
       std::vector<I4> NList;
       std::vector<I4> NHalo;
@@ -510,20 +510,20 @@ class HaloD {
       /// of the Neighbor class below which contains arrays of
       /// uninitialized ExchList objects
       ExchListD();
-
+ public:
    /// Destructor
    ~ExchListD() {}
       /// Halo and Neighbor are friend class to allow access to private
       /// members of the class
-//      friend class HaloD;
-//      friend class NeighborD;
+      friend class HaloD;
+      friend class NeighborD;
    }; // end class ExchList
 
    /// The Neighbor class contains all the information and buffer memory
    /// needed to carry out a halo exchange in each index space for one
    /// neighboring task.
    class NeighborD {
-    public:
+    private:
       I4 TaskID; /// ID of neighboring task
 
       /// Arrays of ExchList objects for sends and recieves for each
@@ -553,18 +553,18 @@ class HaloD {
                const std::vector<std::vector<I4>> &RecvEdge,
                const std::vector<std::vector<I4>> &RecvVert, const I4 NghbrID);
 
-
+ public:
    /// Destructor
    ~NeighborD() {}
 
       /// Halo is a friend class to allow access to private members
       /// of the class
-//      friend class HaloD;
+      friend class HaloD;
 
    }; // end class Neighbor
 
    // Private methods
-
+ private:
    /// Uses info from Decomp to generate a sorted list of tasks that own
    /// elements in the the Halo of the local task for a particular index space.
    /// Utilized only during halo construction
@@ -623,8 +623,9 @@ class HaloD {
       static constexpr bool Is5D = T::rank == 5;
    };
 
-   template<class T> constexpr
-   ArrayMemLoc checkArrayMemLoc() {
+
+   template<typename T>
+   ArrayMemLoc findMemLoc(const T &Array) {
       if (std::is_same_v<MemSpace, HostMemSpace>) {
          return ArrayMemLoc::Both;
       } else if (T::is_hostspace) {
@@ -634,12 +635,14 @@ class HaloD {
       }
    }
 
-   template <class T> constexpr
-   bool useDeviceBuffer() {
-      bool MemLoc = checkArrayMemLoc<T>() == ArrayMemLoc::Both ||
-                    checkArrayMemLoc<T>() == ArrayMemLoc::Device;
+   template <typename T>
+   bool devBufferPUP(const T &Array) {
+      bool OnDev = findMemLoc(Array) == ArrayMemLoc::Both ||
+                   findMemLoc(Array) == ArrayMemLoc::Device;
+      return OnDev;
    }
 
+ public:
    template <typename T>
 //   typename std::enable_if<true, int>::type
    typename std::enable_if<ArrayRank<T>::Is1D, int>::type
@@ -659,7 +662,7 @@ class HaloD {
 
 //      if (CurMemSpace == ArrayMemLoc::Device ||
 //          CurMemSpace == ArrayMemLoc::Both) { 
-       if (useDeviceBuffer<T>()) {
+       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuff);
@@ -720,8 +723,7 @@ class HaloD {
 
       const I4 NJ = Array.extent(1);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot * TotSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuff);
@@ -766,8 +768,7 @@ class HaloD {
 
       LocNeighbor.SendBuffer.resize(NTotList * TotSize);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot * TotSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuff);
@@ -815,8 +816,7 @@ class HaloD {
 
       LocNeighbor.SendBuffer.resize(NTotList * TotSize);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot * TotSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuff);
@@ -868,8 +868,7 @@ class HaloD {
 
       LocNeighbor.SendBuffer.resize(NTotList * TotSize);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot * TotSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuff);
@@ -970,8 +969,7 @@ class HaloD {
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuff);
          parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
@@ -1030,8 +1028,7 @@ class HaloD {
 
       const I4 NJ = Array.extent(1);
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuff);
 
@@ -1075,8 +1072,7 @@ class HaloD {
 
       const I4 NTotList = LocList.NTot;
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuff);
 
@@ -1125,8 +1121,7 @@ class HaloD {
 
       const I4 NTotList = LocList.NTot;
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuff);
 
@@ -1177,8 +1172,7 @@ class HaloD {
 
       const I4 NTotList = LocList.NTot;
 
-      if (CurMemSpace == ArrayMemLoc::Device ||
-          CurMemSpace == ArrayMemLoc::Both) { 
+      if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuff);
 
@@ -1239,7 +1233,7 @@ class HaloD {
    HaloD(const Halo &) = delete;
    HaloD(Halo &&)      = delete;
 
-// public:
+ public:
    // Methods
 
    /// initialize default Halo
@@ -1283,7 +1277,7 @@ class HaloD {
       // Save the index space the input array is defined on
       CurElem = ThisElem;
 
-      CurMemSpace = checkArrayMemLoc<T>();
+//      CurMemSpace = findMemLoc(Array);
 
       // For cell-based quantities, the number of halo layers equals HaloWidth,
       // edge- and vertex-based quantities have an extra layer.
@@ -1311,7 +1305,7 @@ class HaloD {
       // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
       // so the local task is ready to accept messages from each
       // neighboring task
-      startReceives(useDeviceBuffer<T>());
+      startReceives(devBufferPUP(Array));
 
 //      MPI_Barrier(MyComm);
 
@@ -1333,7 +1327,7 @@ class HaloD {
 //      std::cout << " #1 " << std::endl;
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends(useDeviceBuffer<T>());
+      startSends(devBufferPUP(Array));
 
 //      MPI_Barrier(MyComm);
 
@@ -1370,7 +1364,7 @@ class HaloD {
                   }
                }
                if (Neighbors[INghbr].Received and not Neighbors[INghbr].Unpacked) {
-                  if (useDeviceBuffer<T>() && !MpiOnDev) {
+                  if (devBufferPUP(Array) && !MpiOnDev) {
                      Kokkos::resize(Neighbors[INghbr].RecvBuff,
                                     Neighbors[INghbr].RecvBuffH.size());
                      deepCopy(Neighbors[INghbr].RecvBuff,

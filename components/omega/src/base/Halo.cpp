@@ -225,7 +225,7 @@ HaloD::NeighborD::NeighborD(
 
 } // end Neighbor constructor
 
-//Halo::Neighbor::~Neighbor() {}
+//HaloD::NeighborD::~NeighborD() {}
 
 //------------------------------------------------------------------------------
 // Initialize and construct the default Halo. MachEnv and Decomp must already
