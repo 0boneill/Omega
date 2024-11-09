@@ -56,9 +56,10 @@ struct DecayVelocityTendency {
                    const AuxiliaryState *AuxState, int ThickTimeLevel,
                    int VelTimeLevel, TimeInstant Time) const {
 
-      auto *Mesh                = HorzMesh::getDefault();
-      auto NVertLevels          = NormalVelTend.extent_int(1);
-      const auto &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
+      auto *Mesh       = HorzMesh::getDefault();
+      auto NVertLevels = NormalVelTend.extent_int(1);
+      Array2DReal NormalVelEdge;
+      State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
       OMEGA_SCOPE(LocCoeff, Coeff);
 
@@ -77,8 +78,10 @@ int initState() {
    Array3DReal TracerArray;
    Err = Tracers::getAll(TracerArray, 0);
 
-   const auto &LayerThickCell = State->LayerThickness[0];
-   const auto &NormalVelEdge  = State->NormalVelocity[0];
+   Array2DReal LayerThickCell;
+   Array2DReal NormalVelEdge;
+   State->getLayerThickness(LayerThickCell, 0);
+   State->getNormalVelocity(NormalVelEdge, 0);
 
    // Initially set thickness and velocity and tracers to 1
    deepCopy(LayerThickCell, 1);
@@ -99,8 +102,10 @@ int createExactSolution(Real TimeEnd) {
    auto *ExactState =
        OceanState::create("Exact", DefMesh, DefHalo, NVertLevels, 1);
 
-   const auto &LayerThickCell = ExactState->LayerThickness[0];
-   const auto &NormalVelEdge  = ExactState->NormalVelocity[0];
+   Array2DReal LayerThickCell;
+   Array2DReal NormalVelEdge;
+   ExactState->getLayerThickness(LayerThickCell, 0);
+   ExactState->getNormalVelocity(NormalVelEdge, 0);
 
    // There are no thickness tendencies in this test, so exact thickness ==
    // initial thickness
@@ -119,8 +124,10 @@ ErrorMeasures computeErrors() {
    const auto *State      = OceanState::get("TestState");
    const auto *ExactState = OceanState::get("Exact");
 
-   const auto &NormalVelEdge      = State->NormalVelocity[0];
-   const auto &ExactNormalVelEdge = ExactState->NormalVelocity[0];
+   Array2DReal NormalVelEdge;
+   Array2DReal ExactNormalVelEdge;
+   State->getNormalVelocity(NormalVelEdge, 0);
+   ExactState->getNormalVelocity(ExactNormalVelEdge, 0);
 
    // Only velocity errors matters, because thickness remains constant
    ErrorMeasures VelErrors;
@@ -151,6 +158,10 @@ int initTimeStepperTest(const std::string &mesh) {
       return Err;
    }
 
+   // Note that the default time stepper is not used in subsequent tests
+   // but is initialized here because the number of time levels is needed
+   // to initialize the Tracers. If a later timestepper test uses more time
+   // levels than the default, this unit test may fail.
    int TSErr = TimeStepper::init1();
    if (TSErr != 0) {
       Err++;
@@ -186,6 +197,24 @@ int initTimeStepperTest(const std::string &mesh) {
       Err++;
       LOG_ERROR("TimeStepperTest: error initializing tracers infrastructure");
    }
+
+   Err = Tendencies::init();
+   if (Err != 0) {
+      LOG_CRITICAL("Error initializing default tendencies");
+      return Err;
+   }
+
+   // finish initializing default time stepper
+   TSErr = TimeStepper::init2();
+   if (TSErr != 0) {
+      Err++;
+      LOG_ERROR("error initializing default time stepper");
+   }
+
+   // Default time stepper never used and time stepper tests require
+   // the no calendar option, so we reset calendar here
+   Calendar::reset();
+   Calendar::init("No Calendar");
 
    // Non-default init
    // Creating non-default state and auxiliary state to use only one vertical
@@ -249,7 +278,7 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
 
    TimeStepSeconds = TimeEnd / NSteps;
    TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
-   Stepper->setTimeStep(TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
+   Stepper->changeTimeStep(TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
 
    return NSteps;
 }
@@ -260,11 +289,11 @@ void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
 
    const int NSteps            = adjustTimeStep(Stepper, TimeEnd);
    const TimeInterval TimeStep = Stepper->getTimeStep();
+   TimeInstant CurTime         = Stepper->getStartTime();
 
    // Time loop
    for (int Step = 0; Step < NSteps; ++Step) {
-      const TimeInstant Time = TimeStart + Step * TimeStep;
-      Stepper->doStep(State, Time);
+      Stepper->doStep(State, CurTime);
    }
 }
 
@@ -287,15 +316,24 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
                     Real ExpectedOrder, Real ATol) {
    int Err = 0;
 
+   // Set pointers to data
    auto *DefMesh        = HorzMesh::getDefault();
    auto *DefHalo        = Halo::getDefault();
    auto *TestAuxState   = AuxiliaryState::get("TestAuxState");
    auto *TestTendencies = Tendencies::get("TestTendencies");
 
-   Calendar::init("No Calendar");
+   // Set time information
+   const TimeInstant TimeStart(0, 0, 0, 0, 0, 0);
+
+   const Real TimeEnd = 1;
+   TimeInstant TimeEndTI(0, 0, 0, 0, 0, 1);
+
+   const Real BaseTimeStepSeconds = 0.2;
+   TimeInterval TimeStepTI(BaseTimeStepSeconds, TimeUnits::Seconds);
 
    auto *TestTimeStepper = TimeStepper::create(
-       "TestTimeStepper", Type, TestTendencies, TestAuxState, DefMesh, DefHalo);
+       "TestTimeStepper", Type, TimeStart, TimeEndTI, TimeStepTI,
+       TestTendencies, TestAuxState, DefMesh, DefHalo);
 
    if (!TestTimeStepper) {
       Err++;
@@ -304,13 +342,6 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
 
    int NRefinements = 2;
    std::vector<ErrorMeasures> Errors(NRefinements);
-
-   // Start time = 0
-   const TimeInstant TimeStart(0, 0, 0, 0, 0, 0);
-
-   const Real TimeEnd = 1;
-
-   const R8 BaseTimeStepSeconds = 0.2;
 
    // This creates global exact solution and needs to be done only once
    const static bool CallOnlyOnce = [=]() {
@@ -322,7 +353,7 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
 
    // Convergence loop
    for (int RefLevel = 0; RefLevel < NRefinements; ++RefLevel) {
-      TestTimeStepper->setTimeStep(
+      TestTimeStepper->changeTimeStep(
           TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
 
       Err += initState();
@@ -392,6 +423,8 @@ int main(int argc, char *argv[]) {
 
    MPI_Init(&argc, &argv);
    Kokkos::initialize(argc, argv);
+
+   LOG_INFO("----- Time Stepper Unit Test -----");
 
    RetVal += timeStepperTest();
 
