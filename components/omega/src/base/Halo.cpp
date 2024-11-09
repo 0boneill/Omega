@@ -2297,40 +2297,57 @@ int HaloD::exchangeVectorInt(
 // Allocate RecvBuffer and prepare for MPI communication by calling MPI_Irecv
 // for each Neighbor
 
-int HaloD::startReceives() {
+int HaloD::startReceives(bool DeviceArray) {
 
    // Initialize vector to track MPI errors for each MPI_Irecv
    std::vector<I4> IErr(NNghbr, 0);
 
    I4 Err{0}; // Error code to return
 
-   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
-                          (CurMemSpace == ArrayMemLoc::Both);
+//   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
+//                          (CurMemSpace == ArrayMemLoc::Both);
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (RecvFlags[MyElem][INghbr]) {
-         MyNeighbor    = &Neighbors[INghbr];
-         I4 BufferSize = TotSize * MyNeighbor->RecvLists[MyElem].NTot;
+      if (RecvFlags[CurElem][INghbr]) {
+//         auto *LocNeighbor = &Neighbors[INghbr];
+         auto & LocNeighbor = Neighbors[INghbr];
+//         I4 BufferSize = TotSize * MyNeighbor->RecvLists[CurElem].NTot;
+         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
 //         MyNeighbor->RecvBuffer.resize(BufferSize);
 //         Kokkos::resize(MyNeighbor->RecvBuff, BufferSize);
          void* DataPtr{nullptr};
-         if (ExchOnDev) {
-            Kokkos::resize(Neighbors[INghbr].RecvBuff, BufferSize);
-            DataPtr = Neighbors[INghbr].RecvBuff.data();
+//         if (DeviceArray) {
+////            std::cout << INghbr << " " << BufferSize << " " << Neighbors[INghbr].RecvBuff.span_is_contiguous() << std::endl;
+//            Kokkos::resize(LocNeighbor.RecvBuff, BufferSize);
+//            DataPtr = LocNeighbor.RecvBuff.data();
+//         } else {
+//            Kokkos::resize(LocNeighbor.RecvBuffH, BufferSize);
+//            DataPtr = LocNeighbor.RecvBuffH.data();
+//         }
+
+         if (DeviceArray && MpiOnDev) {
+            Kokkos::resize(LocNeighbor.RecvBuff, BufferSize);
+            DataPtr = LocNeighbor.RecvBuff.data();
          } else {
-            Kokkos::resize(Neighbors[INghbr].RecvBuffH, BufferSize);
-            DataPtr = Neighbors[INghbr].RecvBuffH.data();
+            Kokkos::resize(LocNeighbor.RecvBuffH, BufferSize);
+            DataPtr = LocNeighbor.RecvBuffH.data();
          }
+
+//         Neighbors[INghbr].RecvBuffer.resize(BufferSize);
+//         std::vector<R8> RecvBuffer(BufferSize);
 //         const auto &LocBuff = Neighbors[INghbr].RecvBuff;
 //         IErr[INghbr] = MPI_Irecv(&MyNeighbor->RecvBuffer[0], BufferSize,
 //         IErr[INghbr] = MPI_Irecv(MyNeighbor->RecvBuff.data(), BufferSize,
 //         IErr[INghbr] = MPI_Irecv(LocBuff.data(), BufferSize,
+//         IErr[INghbr] = MPI_Irecv(Neighbors[INghbr].RecvBuff.data(), BufferSize,
+//         IErr[INghbr] = MPI_Irecv(&Neighbors[INghbr].RecvBuffer[0], BufferSize,
+//         IErr[INghbr] = MPI_Irecv(&RecvBuffer[0], BufferSize,
          IErr[INghbr] = MPI_Irecv(DataPtr, BufferSize,
-                                  MPI_RealKind, MyNeighbor->TaskID, MPI_ANY_TAG,
-                                  MyComm, &MyNeighbor->RReq);
+                                  MPI_DOUBLE, LocNeighbor.TaskID, MPI_ANY_TAG,
+                                  MyComm, &LocNeighbor.RReq);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} receive from task {}",
-                      IErr[INghbr], MyTask, MyNeighbor->TaskID);
+                      IErr[INghbr], MyTask, LocNeighbor.TaskID);
             Err = -1;
          }
       }
@@ -2343,39 +2360,60 @@ int HaloD::startReceives() {
 // Initiate MPI communication by calling MPI_Isend for each Neighbor to send
 // the packed buffers to each task
 
-int HaloD::startSends() {
+int HaloD::startSends(const bool DeviceArray
+) {
 
    // Initialize vector to track MPI errors for each MPI_Isend
    std::vector<I4> IErr(NNghbr, 0);
 
    I4 Err{0}; // Error code to return
 
-   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
-                          (CurMemSpace == ArrayMemLoc::Both);
+//   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
+//                          (CurMemSpace == ArrayMemLoc::Both);
 //   static bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
 //                           (CurMemSpace == ArrayMemLoc::Both);
 //
 //   using LocBuffType = std::conditional<ExchOnDev, Array1DR8, HostArray1DR8>::type;
 
+   if (DeviceArray) Kokkos::fence();
+
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (SendFlags[MyElem][INghbr]) {
+      if (SendFlags[CurElem][INghbr]) {
+//         auto *LocNeighbor = &Neighbors[INghbr];
+         auto &LocNeighbor = Neighbors[INghbr];
          void* DataPtr{nullptr};
-         if (ExchOnDev) {
-            DataPtr = Neighbors[INghbr].SendBuff.data();
+//         if (DeviceArray) {
+//            DataPtr = LocNeighbor.SendBuff.data();
+//         } else {
+//            DataPtr = LocNeighbor.SendBuffH.data();
+//         }
+         I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
+
+         if (DeviceArray) {
+            if (MpiOnDev) {
+               DataPtr = LocNeighbor.SendBuff.data();
+            } else {
+               Kokkos::resize(LocNeighbor.SendBuffH, BufferSize);
+               deepCopy(LocNeighbor.SendBuffH, LocNeighbor.SendBuff);
+               DataPtr = LocNeighbor.SendBuffH.data();
+            }
          } else {
-            DataPtr = Neighbors[INghbr].SendBuffH.data();
+            DataPtr = LocNeighbor.SendBuffH.data();
          }
 
-         MyNeighbor    = &Neighbors[INghbr];
+//         MyNeighbor    = &Neighbors[INghbr];
 //         if (CurMemSpace == ArrayMemLoc::Device ||
 //             CurMemSpace == ArrayMemLoc::Both) {
-            const auto &LocBuff = Neighbors[INghbr].SendBuff;
+//            const auto &LocBuff = LocNeighbor.SendBuff;
 //         } else {
 //            const auto &LocBuff = Neighbors[INghbr].SendBuffH;
 //         }
-         I4 BufferSize = TotSize * MyNeighbor->SendLists[MyElem].NTot;
+//         std::vector<R8> SendBuffer(BufferSize);
+//         MPI_Isend(Neighbors[INghbr].SendBuff.data(), BufferSize, MPI_DOUBLE,
+//         MPI_Isend(&Neighbors[INghbr].SendBuffer, BufferSize, MPI_DOUBLE,
+//         MPI_Isend(&SendBuffer[0], BufferSize, MPI_DOUBLE,
          MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
-                   MyNeighbor->TaskID, 0, MyComm, &MyNeighbor->SReq);
+                   LocNeighbor.TaskID, 0, MyComm, &LocNeighbor.SReq);
 //         if (ExchOnDev) {
 //            const auto &LocBuff = Neighbors[INghbr].SendBuff;
 //            IErr[INghbr] = 
@@ -2393,7 +2431,7 @@ int HaloD::startSends() {
 //         }
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} send to task {}", IErr[INghbr],
-                      MyTask, MyNeighbor->TaskID);
+                      MyTask, LocNeighbor.TaskID);
             Err = -1;
          }
       }
@@ -2411,111 +2449,111 @@ int HaloD::startSends() {
 // right) is the mesh element dimension. For integer arrays, the value is
 // recast as a Real in a bit-preserving manner using reinterpret_cast to pack
 // into the buffer, which is of type std::vector<Real>.
-int HaloD::packBuffer(const Array1DI4 &Array) {
-
-//   const ExchListD *LocList = &MyNeighbor->SendLists[MyElem];
-   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[MyElem]);
-   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
-
-//   LocNeighbor.SendBuffer.resize(LocList.NTot);
-
-//   Array1DR8 LocBuff("SendBuffer", LocList.NTot);
-   const auto &LocArray = Array;
-//   std::vector<I4> LocInd;
-//   LocInd.resize(LocList.NTot);
-   const auto &LocIndex = LocList.Index;
-//   Array1DI4 LocIndices("LocIndices", LocList.NTot);
-
-//   std::cout << "PackBuffer " << MyTask << " " << LocNeighbor.TaskID << " : " << LocList.NTot << " " << LocArray.size() << " " << LocBuff.size() <<  std::endl;
-//   std::cout << "pack buffer" << std::endl;
-//   auto ArrayH = createHostMirrorCopy(Array);
-
-//   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//      const auto &LocOffs = LocList.Offs;
-//      const auto &LocIdx = LocList.Idx[ILayer];
-//      for (int IExch = 0; IExch < LocList.NList[ILayer]; ++IExch) {
-//         I4 IBuff = LocList.Offsets[ILayer] + IExch;
-//         LocInd[IBuff] = LocList.Ind[ILayer][IExch];
-////         I4 IBuff = LocList.Offs(ILayer) + IExch;
-//         LocNeighbor.SendBuffer[IBuff] =
-////         LocNeighbor.SendBuff(IBuff) =
-//             reinterpret_cast<R8 &>(ArrayH(LocList.Ind[ILayer][IExch]));
-////             reinterpret_cast<Real &>(Array(LocList.Idx[ILayer](IExch)));
-//      }
-//      auto NList_ = LocList.NList[ILayer];
-////      const I4 IOffset = LocList.Offsets[ILayer];
-////      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
-//////         packBuff(LocBuff, IOffset, IExch, LocIdx, LocArray);
-//////         const I4 IBuff = LocList.Offs(ILayer) + IExch;
-////         const I4 IBuff = IOffset + IExch;
-////         const I4 IArr = LocIdx(IExch);
-//////         I4 Val = LocArray(IArr);
-////         auto Val = LocArray(LocIdx(IExch));
+////int HaloD::packBuffer(const Array1DI4 &Array) {
+////
+//////   const ExchListD *LocList = &MyNeighbor->SendLists[CurElem];
+////   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
+////   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+////
+//////   LocNeighbor.SendBuffer.resize(LocList.NTot);
+////
+//////   Array1DR8 LocBuff("SendBuffer", LocList.NTot);
+////   const auto &LocArray = Array;
+//////   std::vector<I4> LocInd;
+//////   LocInd.resize(LocList.NTot);
+////   const auto &LocIndex = LocList.Index;
+//////   Array1DI4 LocIndices("LocIndices", LocList.NTot);
+////
+//////   std::cout << "PackBuffer " << MyTask << " " << LocNeighbor.TaskID << " : " << LocList.NTot << " " << LocArray.size() << " " << LocBuff.size() <<  std::endl;
+//////   std::cout << "pack buffer" << std::endl;
+//////   auto ArrayH = createHostMirrorCopy(Array);
+////
+//////   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
+//////      const auto &LocOffs = LocList.Offs;
+//////      const auto &LocIdx = LocList.Idx[ILayer];
+//////      for (int IExch = 0; IExch < LocList.NList[ILayer]; ++IExch) {
+//////         I4 IBuff = LocList.Offsets[ILayer] + IExch;
+//////         LocInd[IBuff] = LocList.Ind[ILayer][IExch];
+////////         I4 IBuff = LocList.Offs(ILayer) + IExch;
+//////         LocNeighbor.SendBuffer[IBuff] =
+////////         LocNeighbor.SendBuff(IBuff) =
+//////             reinterpret_cast<R8 &>(ArrayH(LocList.Ind[ILayer][IExch]));
+////////             reinterpret_cast<Real &>(Array(LocList.Idx[ILayer](IExch)));
+//////      }
+//////      auto NList_ = LocList.NList[ILayer];
+////////      const I4 IOffset = LocList.Offsets[ILayer];
+////////      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
+//////////         packBuff(LocBuff, IOffset, IExch, LocIdx, LocArray);
+//////////         const I4 IBuff = LocList.Offs(ILayer) + IExch;
+////////         const I4 IBuff = IOffset + IExch;
+////////         const I4 IArr = LocIdx(IExch);
+//////////         I4 Val = LocArray(IArr);
+////////         auto Val = LocArray(LocIdx(IExch));
+////////         const R8 RVal = reinterpret_cast<R8 &>(Val);
+//////////         R8 RVal = reinterpret_cast<R8 &>(LocArray(IArr));
+//////////         LocIndices(IBuff) = IArr;
+//////////         LocNeighbor.SendBuff(IBuff) =
+////////         LocBuff(IBuff) = //0;
+////////            RVal;
+//////////            reinterpret_cast<R8 &>(LocArray(IArr));
+//////////            reinterpret_cast<R8 &>(LocArray(LocIdx(IExch)));
+////////      });
+////////   }
+////
+////   if (CurMemSpace == ArrayMemLoc::Device || CurMemSpace == ArrayMemLoc::Both) { 
+////      Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot);
+////      const auto &LocBuff = Neighbors[CurNeighbor].SendBuff;
+////
+////      parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+////         auto Val = LocArray(LocIndex(IExch));
 ////         const R8 RVal = reinterpret_cast<R8 &>(Val);
-//////         R8 RVal = reinterpret_cast<R8 &>(LocArray(IArr));
-//////         LocIndices(IBuff) = IArr;
-//////         LocNeighbor.SendBuff(IBuff) =
-////         LocBuff(IBuff) = //0;
-////            RVal;
-//////            reinterpret_cast<R8 &>(LocArray(IArr));
-//////            reinterpret_cast<R8 &>(LocArray(LocIdx(IExch)));
+////         LocBuff(IExch) = RVal;
 ////      });
+////
+////   } else {
+//////      Kokkos::resize(LocNeighbor.SendBuffH, LocList.NTot);
+//////      const auto &LocBuffH = Neighbors[CurNeighbor].SendBuffH;
+//////      for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+//////         
+//////      }
 ////   }
-
-   if (CurMemSpace == ArrayMemLoc::Device || CurMemSpace == ArrayMemLoc::Both) { 
-      Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot);
-      const auto &LocBuff = Neighbors[CurNeighbor].SendBuff;
-
-      parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
-         auto Val = LocArray(LocIndex(IExch));
-         const R8 RVal = reinterpret_cast<R8 &>(Val);
-         LocBuff(IExch) = RVal;
-      });
-
-   } else {
-//      Kokkos::resize(LocNeighbor.SendBuffH, LocList.NTot);
-//      const auto &LocBuffH = Neighbors[CurNeighbor].SendBuffH;
-//      for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
-//         
-//      }
-   }
-
-
-   std::cout << " buffer packed" << std::endl;
-   Kokkos::fence();
-
-//   deepCopy(LocNeighbor.SendBuff, LocBuff);
-//   auto PackedBuff = createHostMirrorCopy(LocNeighbor.SendBuff);
-//   auto PackedBuff = createHostMirrorCopy(LocBuff);
-//   auto HostIndices = createHostMirrorCopy(LocIndices);
-
-//   FILE *fptr;
-//   char filename[32];
-//   sprintf(filename, "out%d_%d.dat", MyTask, LocNeighbor.TaskID);
-//   fptr = fopen(filename, "w");
-//
-////   for ( int ILayer = 0; ILayer < NumLayers ; ++ILayer) {
-////      const auto &LocIdx = LocList.Idx[ILayer];
-////      auto IdxMirr = createHostMirrorCopy(LocIdx);
-////      for ( int IList = 0; IList < LocList.NList[ILayer] ; ++IList) {
-////         fprintf(fptr, "%8d %8d %8d %8d\n", ILayer, IList, LocList.Ind[ILayer][IList],
-////         IdxMirr(IList));
-////      }
-////   }
-//   for (int I = 0; I < LocList.NTot; ++I) {
-////      fprintf(fptr, "%8d %8d %8d\n", I, LocInd[I], HostIndices(I));
-//      fprintf(fptr, "%8d %8d %8d\n", I, reinterpret_cast<I4 &>(LocNeighbor.SendBuffer[I]),
-//              reinterpret_cast<I4 &>(PackedBuff(I)));
-//   }
-//
-//   fclose(fptr);
-   std::cout << "end packBuffer routine" << std::endl;
-   return 0;
-} // end packBuffer HostArray1DI4
+////
+////
+////   std::cout << " buffer packed" << std::endl;
+////   Kokkos::fence();
+////
+//////   deepCopy(LocNeighbor.SendBuff, LocBuff);
+//////   auto PackedBuff = createHostMirrorCopy(LocNeighbor.SendBuff);
+//////   auto PackedBuff = createHostMirrorCopy(LocBuff);
+//////   auto HostIndices = createHostMirrorCopy(LocIndices);
+////
+//////   FILE *fptr;
+//////   char filename[32];
+//////   sprintf(filename, "out%d_%d.dat", MyTask, LocNeighbor.TaskID);
+//////   fptr = fopen(filename, "w");
+//////
+////////   for ( int ILayer = 0; ILayer < NumLayers ; ++ILayer) {
+////////      const auto &LocIdx = LocList.Idx[ILayer];
+////////      auto IdxMirr = createHostMirrorCopy(LocIdx);
+////////      for ( int IList = 0; IList < LocList.NList[ILayer] ; ++IList) {
+////////         fprintf(fptr, "%8d %8d %8d %8d\n", ILayer, IList, LocList.Ind[ILayer][IList],
+////////         IdxMirr(IList));
+////////      }
+////////   }
+//////   for (int I = 0; I < LocList.NTot; ++I) {
+////////      fprintf(fptr, "%8d %8d %8d\n", I, LocInd[I], HostIndices(I));
+//////      fprintf(fptr, "%8d %8d %8d\n", I, reinterpret_cast<I4 &>(LocNeighbor.SendBuffer[I]),
+//////              reinterpret_cast<I4 &>(PackedBuff(I)));
+//////   }
+//////
+//////   fclose(fptr);
+////   std::cout << "end packBuffer routine" << std::endl;
+////   return 0;
+////} // end packBuffer HostArray1DI4
 /*
 int HaloD::packBuffer(const HostArray1DI8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
 
    MyNeighbor->SendBuffer.resize(MyList->NTot);
 
@@ -2532,7 +2570,7 @@ int HaloD::packBuffer(const HostArray1DI8 Array) {
 
 int HaloD::packBuffer(const HostArray1DR4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
 
    MyNeighbor->SendBuffer.resize(MyList->NTot);
 
@@ -2548,7 +2586,7 @@ int HaloD::packBuffer(const HostArray1DR4 Array) {
 
 int HaloD::packBuffer(const HostArray1DR8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
 
    MyNeighbor->SendBuffer.resize(MyList->NTot);
 
@@ -2564,7 +2602,7 @@ int HaloD::packBuffer(const HostArray1DR8 Array) {
 
 int HaloD::packBuffer(const HostArray2DI4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NJ           = Array.extent(1);
 
    MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
@@ -2584,7 +2622,7 @@ int HaloD::packBuffer(const HostArray2DI4 Array) {
 
 int HaloD::packBuffer(const HostArray2DI8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NJ           = Array.extent(1);
 
    MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
@@ -2604,7 +2642,7 @@ int HaloD::packBuffer(const HostArray2DI8 Array) {
 
 int HaloD::packBuffer(const HostArray2DR4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NJ           = Array.extent(1);
 
    MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
@@ -2624,7 +2662,7 @@ int HaloD::packBuffer(const HostArray2DR4 Array) {
 
 int HaloD::packBuffer(const HostArray2DR8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NJ           = Array.extent(1);
 
    MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
@@ -2644,7 +2682,7 @@ int HaloD::packBuffer(const HostArray2DR8 Array) {
 
 int HaloD::packBuffer(const HostArray3DI4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -2669,7 +2707,7 @@ int HaloD::packBuffer(const HostArray3DI4 Array) {
 
 int HaloD::packBuffer(const HostArray3DI8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -2694,7 +2732,7 @@ int HaloD::packBuffer(const HostArray3DI8 Array) {
 
 int HaloD::packBuffer(const HostArray3DR4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -2719,7 +2757,7 @@ int HaloD::packBuffer(const HostArray3DR4 Array) {
 
 int HaloD::packBuffer(const HostArray3DR8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -2744,7 +2782,7 @@ int HaloD::packBuffer(const HostArray3DR8 Array) {
 
 int HaloD::packBuffer(const HostArray4DI4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -2773,7 +2811,7 @@ int HaloD::packBuffer(const HostArray4DI4 Array) {
 
 int HaloD::packBuffer(const HostArray4DI8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -2802,7 +2840,7 @@ int HaloD::packBuffer(const HostArray4DI8 Array) {
 
 int HaloD::packBuffer(const HostArray4DR4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -2831,7 +2869,7 @@ int HaloD::packBuffer(const HostArray4DR4 Array) {
 
 int HaloD::packBuffer(const HostArray4DR8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -2860,7 +2898,7 @@ int HaloD::packBuffer(const HostArray4DR8 Array) {
 
 int HaloD::packBuffer(const HostArray5DI4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -2892,7 +2930,7 @@ int HaloD::packBuffer(const HostArray5DI4 Array) {
 
 int HaloD::packBuffer(const HostArray5DI8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -2924,7 +2962,7 @@ int HaloD::packBuffer(const HostArray5DI8 Array) {
 
 int HaloD::packBuffer(const HostArray5DR4 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -2956,7 +2994,7 @@ int HaloD::packBuffer(const HostArray5DR4 Array) {
 
 int HaloD::packBuffer(const HostArray5DR8 Array) {
 
-   ExchListD *MyList = &MyNeighbor->SendLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -2997,42 +3035,42 @@ int HaloD::packBuffer(const HostArray5DR8 Array) {
 // integer type (I4 or I8) using reinterpret_cast, and then saved in the
 // input Array.
 
-int HaloD::unpackBuffer(Array1DI4 &Array) {
-
-//   std::cout << "unpack buffer" << std::endl;
-//   const ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
-   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[MyElem]);
-   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
-   const auto &LocArray = Array;
-   const auto &LocBuff = Neighbors[CurNeighbor].RecvBuff;
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-////         I4 IBuff = MyList->Offsets[ILayer] + IExch;
-//         I4 IBuff = MyList->Offs(ILayer) + IExch;
-////       Array(MyList->Ind[ILayer][IExch]) =
-//         Array(MyList->Idx[ILayer](IExch)) =
-//             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
-//      }
-      const auto &LocIdx = LocList.Idx[ILayer];
-      const I4 IOffset = LocList.Offsets[ILayer];
-      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
-//         const I4 IBuff = LocList->Offs(ILayer) + IExch;
-         const I4 IBuff = IOffset + IExch;
-         const I4 IArr = LocIdx(IExch);
-//         Array(LocList->Idx[ILayer](IExch)) =
-//             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
-         LocArray(IArr) = 
-             reinterpret_cast<I4 &>(LocBuff(IBuff));
-      });
-   }
-
-   return 0;
-} // end unpackBuffer HostArray1DI4
+////int HaloD::unpackBuffer(Array1DI4 &Array) {
+////
+//////   std::cout << "unpack buffer" << std::endl;
+//////   const ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
+////   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
+////   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+////   const auto &LocArray = Array;
+////   const auto &LocBuff = Neighbors[CurNeighbor].RecvBuff;
+////
+////   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
+//////      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
+////////         I4 IBuff = MyList->Offsets[ILayer] + IExch;
+//////         I4 IBuff = MyList->Offs(ILayer) + IExch;
+////////       Array(MyList->Ind[ILayer][IExch]) =
+//////         Array(MyList->Idx[ILayer](IExch)) =
+//////             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
+//////      }
+////      const auto &LocIdx = LocList.Idx[ILayer];
+////      const I4 IOffset = LocList.Offsets[ILayer];
+////      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
+//////         const I4 IBuff = LocList->Offs(ILayer) + IExch;
+////         const I4 IBuff = IOffset + IExch;
+////         const I4 IArr = LocIdx(IExch);
+//////         Array(LocList->Idx[ILayer](IExch)) =
+//////             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
+////         LocArray(IArr) = 
+////             reinterpret_cast<I4 &>(LocBuff(IBuff));
+////      });
+////   }
+////
+////   return 0;
+////} // end unpackBuffer HostArray1DI4
 /*
 int HaloD::unpackBuffer(HostArray1DI8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
       for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
@@ -3047,7 +3085,7 @@ int HaloD::unpackBuffer(HostArray1DI8 &Array) {
 
 int HaloD::unpackBuffer(HostArray1DR4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
       for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
@@ -3061,7 +3099,7 @@ int HaloD::unpackBuffer(HostArray1DR4 &Array) {
 
 int HaloD::unpackBuffer(HostArray1DR8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
       for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
@@ -3075,7 +3113,7 @@ int HaloD::unpackBuffer(HostArray1DR8 &Array) {
 
 int HaloD::unpackBuffer(HostArray2DI4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NJ           = Array.extent(1);
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
@@ -3093,7 +3131,7 @@ int HaloD::unpackBuffer(HostArray2DI4 &Array) {
 
 int HaloD::unpackBuffer(HostArray2DI8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NJ           = Array.extent(1);
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
@@ -3111,7 +3149,7 @@ int HaloD::unpackBuffer(HostArray2DI8 &Array) {
 
 int HaloD::unpackBuffer(HostArray2DR4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NJ           = Array.extent(1);
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
@@ -3129,7 +3167,7 @@ int HaloD::unpackBuffer(HostArray2DR4 &Array) {
 
 int HaloD::unpackBuffer(HostArray2DR8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NJ           = Array.extent(1);
 
    for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
@@ -3147,7 +3185,7 @@ int HaloD::unpackBuffer(HostArray2DR8 &Array) {
 
 int HaloD::unpackBuffer(HostArray3DI4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -3170,7 +3208,7 @@ int HaloD::unpackBuffer(HostArray3DI4 &Array) {
 
 int HaloD::unpackBuffer(HostArray3DI8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -3193,7 +3231,7 @@ int HaloD::unpackBuffer(HostArray3DI8 &Array) {
 
 int HaloD::unpackBuffer(HostArray3DR4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -3216,7 +3254,7 @@ int HaloD::unpackBuffer(HostArray3DR4 &Array) {
 
 int HaloD::unpackBuffer(HostArray3DR8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NK           = Array.extent(0);
    int NJ           = Array.extent(2);
 
@@ -3239,7 +3277,7 @@ int HaloD::unpackBuffer(HostArray3DR8 &Array) {
 
 int HaloD::unpackBuffer(HostArray4DI4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -3266,7 +3304,7 @@ int HaloD::unpackBuffer(HostArray4DI4 &Array) {
 
 int HaloD::unpackBuffer(HostArray4DI8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -3293,7 +3331,7 @@ int HaloD::unpackBuffer(HostArray4DI8 &Array) {
 
 int HaloD::unpackBuffer(HostArray4DR4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -3320,7 +3358,7 @@ int HaloD::unpackBuffer(HostArray4DR4 &Array) {
 
 int HaloD::unpackBuffer(HostArray4DR8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NL           = Array.extent(0);
    int NK           = Array.extent(1);
    int NJ           = Array.extent(3);
@@ -3347,7 +3385,7 @@ int HaloD::unpackBuffer(HostArray4DR8 &Array) {
 
 int HaloD::unpackBuffer(HostArray5DI4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -3377,7 +3415,7 @@ int HaloD::unpackBuffer(HostArray5DI4 &Array) {
 
 int HaloD::unpackBuffer(HostArray5DI8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -3407,7 +3445,7 @@ int HaloD::unpackBuffer(HostArray5DI8 &Array) {
 
 int HaloD::unpackBuffer(HostArray5DR4 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);
@@ -3437,7 +3475,7 @@ int HaloD::unpackBuffer(HostArray5DR4 &Array) {
 
 int HaloD::unpackBuffer(HostArray5DR8 &Array) {
 
-   ExchListD *MyList = &MyNeighbor->RecvLists[MyElem];
+   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
    int NM           = Array.extent(0);
    int NL           = Array.extent(1);
    int NK           = Array.extent(2);

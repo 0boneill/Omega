@@ -152,15 +152,17 @@ void haloExchangeTestD(
 //   parallelReduce({NTot}, KOKKOS_LAMBDA(int N, int &Accum) {
       if (CollapsedInit(N) != CollapsedTest(N)) {
 //         std::cout << N << " " << CollapsedInit(N) << " " << CollapsedTest(N) << std::endl;
-         IErr = -1;
+//         IErr = -1;
          ++NDiff;
 ////         ++Accum;
 ////         break;
       }
    }
 //   }, NDiff);
-//   std::cout << "ndiff: " << NDiff << std::endl;
-   if (NDiff != 0) IErr = -1;
+   if (NDiff != 0) {
+      IErr = -1;
+      std::cout << "ndiff: " << NDiff << std::endl;
+   }
 //   std::cout << " compare complete " << std::endl;
    if (IErr == 0) {
       LOG_INFO("HaloTest: {} exchange test PASS", Label);
@@ -309,8 +311,8 @@ int main(int argc, char *argv[]) {
 //      std::cout << " halo test start " << std::endl;
       haloExchangeTestD(DefHaloD, Init1DI4Cell, Test1DI4Cell, "1DI4 Cell",
                        TotErr);
-//      haloExchangeTestD(DefHaloD, Init1DI4CellD, Test1DI4CellD, "1DI4 CellD",
-//                       TotErr);
+      haloExchangeTestD(DefHaloD, Init1DI4CellD, Test1DI4CellD, "1DI4 CellD",
+                       TotErr);
 //      if(DefHaloD->checkArrayMemLoc<HostArray1DI4>() == ArrayMemLoc::Host) {
 //         std::cout << "Array on Host" << std::endl;
 //      }
@@ -334,10 +336,10 @@ int main(int argc, char *argv[]) {
 
       deepCopy(Init1DI4EdgeD, Init1DI4Edge);
       deepCopy(Test1DI4EdgeD, Test1DI4Edge);
-//      haloExchangeTestD(DefHaloD, Init1DI4Edge, Test1DI4Edge, "1DI4 Edge", TotErr,
-//                       OnEdge);
-//      haloExchangeTestD(DefHaloD, Init1DI4EdgeD, Test1DI4EdgeD, "1DI4 EdgeD", TotErr,
-//                       OnEdge);
+      haloExchangeTestD(DefHaloD, Init1DI4Edge, Test1DI4Edge, "1DI4 Edge", TotErr,
+                       OnEdge);
+      haloExchangeTestD(DefHaloD, Init1DI4EdgeD, Test1DI4EdgeD, "1DI4 EdgeD", TotErr,
+                       OnEdge);
 
       HostArray1DI4 Init1DI4Vertex("Init1DI4Vertex",
                                           DefDecomp->NVerticesSize);
@@ -359,10 +361,10 @@ int main(int argc, char *argv[]) {
 
       deepCopy(Init1DI4VertexD, Init1DI4Vertex);
       deepCopy(Test1DI4VertexD, Test1DI4Vertex);
-//      haloExchangeTestD(DefHaloD, Init1DI4Vertex, Test1DI4Vertex, "1DI4 Vertex",
-//                       TotErr, OnVertex);
-//      haloExchangeTestD(DefHaloD, Init1DI4VertexD, Test1DI4VertexD, "1DI4 VertexD",
-//                       TotErr, OnVertex);
+      haloExchangeTestD(DefHaloD, Init1DI4Vertex, Test1DI4Vertex, "1DI4 Vertex",
+                       TotErr, OnVertex);
+      haloExchangeTestD(DefHaloD, Init1DI4VertexD, Test1DI4VertexD, "1DI4 VertexD",
+                       TotErr, OnVertex);
 
       // Declaration of variables for remaining tests
 
@@ -421,8 +423,38 @@ int main(int argc, char *argv[]) {
       HostArray5DR4 Test5DR4("Test5DR4", N5, N4, N3, NumAll, N2);
       HostArray5DR8 Test5DR8("Test5DR8", N5, N4, N3, NumAll, N2);
 
-      Array2DR8 InitD2DR8("Test2DR8", NumAll, N2);
-      Array2DR8 TestD2DR8("Test2DR8", NumAll, N2);
+      Array2DI4 Init2DI4D("Init2DI4D", NumAll, N2);
+      Array2DI4 Test2DI4D("Test2DI4D", NumAll, N2);
+      Array2DI8 Init2DI8D("Init2DI8D", NumAll, N2);
+      Array2DI8 Test2DI8D("Test2DI8D", NumAll, N2);
+      Array2DR4 Init2DR4D("Init2DR4D", NumAll, N2);
+      Array2DR4 Test2DR4D("Test2DR4D", NumAll, N2);
+      Array2DR8 Init2DR8D("Init2DR8D", NumAll, N2);
+      Array2DR8 Test2DR8D("Test2DR8D", NumAll, N2);
+      Array3DI4 Init3DI4D("Init3DI4D", N3, NumAll, N2);
+      Array3DI4 Test3DI4D("Test3DI4D", N3, NumAll, N2);
+      Array3DI8 Init3DI8D("Init3DI8D", N3, NumAll, N2);
+      Array3DI8 Test3DI8D("Test3DI8D", N3, NumAll, N2);
+      Array3DR4 Init3DR4D("Init3DR4D", N3, NumAll, N2);
+      Array3DR4 Test3DR4D("Test3DR4D", N3, NumAll, N2);
+      Array3DR8 Init3DR8D("Init3DR8D", N3, NumAll, N2);
+      Array3DR8 Test3DR8D("Test3DR8D", N3, NumAll, N2);
+      Array4DI4 Init4DI4D("Init4DI4D", N4, N3, NumAll, N2);
+      Array4DI4 Test4DI4D("Test4DI4D", N4, N3, NumAll, N2);
+      Array4DI8 Init4DI8D("Init4DI8D", N4, N3, NumAll, N2);
+      Array4DI8 Test4DI8D("Test4DI8D", N4, N3, NumAll, N2);
+      Array4DR4 Init4DR4D("Init4DR4D", N4, N3, NumAll, N2);
+      Array4DR4 Test4DR4D("Test4DR4D", N4, N3, NumAll, N2);
+      Array4DR8 Init4DR8D("Init4DR8D", N4, N3, NumAll, N2);
+      Array4DR8 Test4DR8D("Test4DR8D", N4, N3, NumAll, N2);
+      Array5DI4 Init5DI4D("Init5DI4D", N5, N4, N3, NumAll, N2);
+      Array5DI4 Test5DI4D("Test5DI4D", N5, N4, N3, NumAll, N2);
+      Array5DI8 Init5DI8D("Init5DI8D", N5, N4, N3, NumAll, N2);
+      Array5DI8 Test5DI8D("Test5DI8D", N5, N4, N3, NumAll, N2);
+      Array5DR4 Init5DR4D("Init5DR4D", N5, N4, N3, NumAll, N2);
+      Array5DR4 Test5DR4D("Test5DR4D", N5, N4, N3, NumAll, N2);
+      Array5DR8 Init5DR8D("Init5DR8D", N5, N4, N3, NumAll, N2);
+      Array5DR8 Test5DR8D("Test5DR8D", N5, N4, N3, NumAll, N2);
 
       // Initialize and run remaining 1D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {
@@ -449,12 +481,12 @@ int main(int argc, char *argv[]) {
       deepCopy(Test1DR4D, Test1DR4);
       deepCopy(Test1DR8D, Test1DR8);
 
-//      haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8", TotErr);
-//      haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4", TotErr);
-//      haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8", TotErr);
-//      haloExchangeTestD(DefHaloD, Init1DI8D, Test1DI8D, "1DI8D", TotErr);
-//      haloExchangeTestD(DefHaloD, Init1DR4D, Test1DR4D, "1DR4D", TotErr);
-//      haloExchangeTestD(DefHaloD, Init1DR8D, Test1DR8D, "1DR8D", TotErr);
+      haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8", TotErr);
+      haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4", TotErr);
+      haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DI8D, Test1DI8D, "1DI8D", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DR4D, Test1DR4D, "1DR4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DR8D, Test1DR8D, "1DR8D", TotErr);
 
       // Initialize and run 2D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {
@@ -472,7 +504,10 @@ int main(int argc, char *argv[]) {
       deepCopy(Test2DR4, Init2DR4);
       deepCopy(Test2DR8, Init2DR8);
 
-//      deepCopy(InitD2DR8, Init2DR8);
+      deepCopy(Init2DI4D, Init2DI4);
+      deepCopy(Init2DI8D, Init2DI8);
+      deepCopy(Init2DR4D, Init2DR4);
+      deepCopy(Init2DR8D, Init2DR8);
 
       for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
          for (int J = 0; J < N2; ++J) {
@@ -482,14 +517,21 @@ int main(int argc, char *argv[]) {
             Test2DR8(ICell, J) = -1;
          }
       }
-//      deepCopy(TestD2DR8, Test2DR8);
 
-//      haloExchangeTest(DefHalo, Init2DI4, Test2DI4, "2DI4", TotErr);
-//      haloExchangeTest(DefHalo, Init2DI8, Test2DI8, "2DI8", TotErr);
-//      haloExchangeTest(DefHalo, Init2DR4, Test2DR4, "2DR4", TotErr);
-//      haloExchangeTest(DefHalo, Init2DR8, Test2DR8, "2DR8", TotErr);
+      deepCopy(Test2DI4D, Test2DI4);
+      deepCopy(Test2DI8D, Test2DI8);
+      deepCopy(Test2DR4D, Test2DR4);
+      deepCopy(Test2DR8D, Test2DR8);
 
-//      haloDExchangeTest(DefHaloD, InitD2DR8, TestD2DR8, "D2DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DI4, Test2DI4, "2DI4", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DI8, Test2DI8, "2DI8", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DR4, Test2DR4, "2DR4", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DR8, Test2DR8, "2DR8", TotErr);
+
+      haloExchangeTestD(DefHaloD, Init2DI4D, Test2DI4D, "2DI4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DI8D, Test2DI8D, "2DI8D", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DR4D, Test2DR4D, "2DR4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init2DR8D, Test2DR8D, "2DR8D", TotErr);
 
       // Initialize and run 3D tests
       for (int K = 0; K < N3; ++K) {
@@ -509,6 +551,11 @@ int main(int argc, char *argv[]) {
       deepCopy(Test3DR4, Init3DR4);
       deepCopy(Test3DR8, Init3DR8);
 
+      deepCopy(Init3DI4D, Init3DI4);
+      deepCopy(Init3DI8D, Init3DI8);
+      deepCopy(Init3DR4D, Init3DR4);
+      deepCopy(Init3DR8D, Init3DR8);
+
       for (int K = 0; K < N3; ++K) {
          for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
             for (int J = 0; J < N2; ++J) {
@@ -520,10 +567,20 @@ int main(int argc, char *argv[]) {
          }
       }
 
-//      haloExchangeTest(DefHalo, Init3DI4, Test3DI4, "3DI4", TotErr);
-//      haloExchangeTest(DefHalo, Init3DI8, Test3DI8, "3DI8", TotErr);
-//      haloExchangeTest(DefHalo, Init3DR4, Test3DR4, "3DR4", TotErr);
-//      haloExchangeTest(DefHalo, Init3DR8, Test3DR8, "3DR8", TotErr);
+      deepCopy(Test3DI4D, Test3DI4);
+      deepCopy(Test3DI8D, Test3DI8);
+      deepCopy(Test3DR4D, Test3DR4);
+      deepCopy(Test3DR8D, Test3DR8);
+
+
+      haloExchangeTestD(DefHaloD, Init3DI4, Test3DI4, "3DI4", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DI8, Test3DI8, "3DI8", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DR4, Test3DR4, "3DR4", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DR8, Test3DR8, "3DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DI4D, Test3DI4D, "3DI4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DI8D, Test3DI8D, "3DI8D", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DR4D, Test3DR4D, "3DR4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init3DR8D, Test3DR8D, "3DR8D", TotErr);
 
       // Initialize and run 4D tests
       for (int L = 0; L < N4; ++L) {
@@ -546,6 +603,11 @@ int main(int argc, char *argv[]) {
       deepCopy(Test4DR4, Init4DR4);
       deepCopy(Test4DR8, Init4DR8);
 
+      deepCopy(Init4DI4D, Init4DI4);
+      deepCopy(Init4DI8D, Init4DI8);
+      deepCopy(Init4DR4D, Init4DR4);
+      deepCopy(Init4DR8D, Init4DR8);
+
       for (int L = 0; L < N4; ++L) {
          for (int K = 0; K < N3; ++K) {
             for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
@@ -559,10 +621,19 @@ int main(int argc, char *argv[]) {
          }
       }
 
-//      haloExchangeTest(DefHalo, Init4DI4, Test4DI4, "4DI4", TotErr);
-//      haloExchangeTest(DefHalo, Init4DI8, Test4DI8, "4DI8", TotErr);
-//      haloExchangeTest(DefHalo, Init4DR4, Test4DR4, "4DR4", TotErr);
-//      haloExchangeTest(DefHalo, Init4DR8, Test4DR8, "4DR8", TotErr);
+      deepCopy(Test4DI4D, Test4DI4);
+      deepCopy(Test4DI8D, Test4DI8);
+      deepCopy(Test4DR4D, Test4DR4);
+      deepCopy(Test4DR8D, Test4DR8);
+
+      haloExchangeTestD(DefHaloD, Init4DI4, Test4DI4, "4DI4", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DI8, Test4DI8, "4DI8", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DR4, Test4DR4, "4DR4", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DR8, Test4DR8, "4DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DI4D, Test4DI4D, "4DI4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DI8D, Test4DI8D, "4DI8D", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DR4D, Test4DR4D, "4DR4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init4DR8D, Test4DR8D, "4DR8D", TotErr);
 
       // Initialize and run 5D tests
       for (int M = 0; M < N5; ++M) {
@@ -590,6 +661,11 @@ int main(int argc, char *argv[]) {
       deepCopy(Test5DR4, Init5DR4);
       deepCopy(Test5DR8, Init5DR8);
 
+      deepCopy(Init5DI4D, Init5DI4);
+      deepCopy(Init5DI8D, Init5DI8);
+      deepCopy(Init5DR4D, Init5DR4);
+      deepCopy(Init5DR8D, Init5DR8);
+
       for (int M = 0; M < N5; ++M) {
          for (int L = 0; L < N4; ++L) {
             for (int K = 0; K < N3; ++K) {
@@ -604,6 +680,20 @@ int main(int argc, char *argv[]) {
             }
          }
       }
+
+      deepCopy(Test5DI4D, Test5DI4);
+      deepCopy(Test5DI8D, Test5DI8);
+      deepCopy(Test5DR4D, Test5DR4);
+      deepCopy(Test5DR8D, Test5DR8);
+
+      haloExchangeTestD(DefHaloD, Init5DI4, Test5DI4, "5DI4", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DI8, Test5DI8, "5DI8", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DR4, Test5DR4, "5DR4", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DR8, Test5DR8, "5DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DI4D, Test5DI4D, "5DI4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DI8D, Test5DI8D, "5DI8D", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DR4D, Test5DR4D, "5DR4D", TotErr);
+      haloExchangeTestD(DefHaloD, Init5DR8D, Test5DR8D, "5DR8D", TotErr);
 
 //      haloExchangeTest(DefHalo, Init5DI4, Test5DI4, "5DI4", TotErr);
 //      haloExchangeTest(DefHalo, Init5DI8, Test5DI8, "5DI8", TotErr);
