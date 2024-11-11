@@ -98,55 +98,65 @@ HaloD::ExchListD::ExchListD(
    // First dimension of List is the number of halo layers
    I4 HaloLayers = List.size();
 
+   // Allocate member vectors and arrays based on number of halo layers
    NHalo.resize(HaloLayers);
-   Offsets.resize(HaloLayers);
+   OffsetsH = HostArray1DI4("OffsetsH", HaloLayers);
+   Offsets  = Array1DI4("Offsets", HaloLayers);
+
+   // Count the total number of elements in the list, set the number of
+   // elements in each halo layer, and set the offsets for each layer
    NTot = 0;
-   Offsets[0] = 0;
+   OffsetsH(0) = 0;
    for (int IHalo = 0; IHalo < HaloLayers-1; ++IHalo) {
       NHalo[IHalo] = List[IHalo].size();
       NTot += NHalo[IHalo];
-      Offsets[IHalo + 1] = Offsets[IHalo] + NHalo[IHalo];
+      OffsetsH(IHalo + 1) = OffsetsH(IHalo) + NHalo[IHalo];
    }
    NHalo[HaloLayers-1] = List[HaloLayers-1].size();
    NTot += NHalo[HaloLayers-1];
 
+   // Copy OffsetsH to device
+   deepCopy(Offsets, OffsetsH);
+
    IndexH = HostArray1DI4("IndexH", NTot);
    Index = Array1DI4("Index", NTot);
 
+   // Copy List into member IndexH array on host which holds the indices
    for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
       for (int IList = 0; IList < NHalo[IHalo]; ++IList) {
-         IndexH[Offsets[IHalo] + IList] = List[IHalo][IList];
+         IndexH(OffsetsH(IHalo) + IList) = List[IHalo][IList];
       }
    }
+   // Copy IndexH to device
    deepCopy(Index, IndexH);
 
    // Set member vector sizes to number of halo layers
-   NList.resize(HaloLayers);
+//   NList.resize(HaloLayers);
 //   NLstH = HostArray1DI4("", HaloLayers);
 //   OffsH = HostArray1DI4("", HaloLayers);
 
    // Copy List into member 2D vector Ind which holds the indices
-   Ind = List;
+//   Ind = List;
 
-   Idx.resize(HaloLayers);
-   IdxH.resize(HaloLayers);
+//   Idx.resize(HaloLayers);
+//   IdxH.resize(HaloLayers);
 //   Idx = List;
 
    // Count the total number of elements in the list and set the
    // number of elements in each halo layer
-   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
+//   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
 //      NList[IHalo] = List[IHalo].size();
-      NList[IHalo] = NHalo[IHalo];
-      IdxH[IHalo] = HostArray1DI4("", NList[IHalo]);
-      for (int IList = 0; IList < NList[IHalo]; ++IList) {
-         IdxH[IHalo](IList) = List[IHalo][IList];
-      }
+//      NList[IHalo] = NHalo[IHalo];
+//      IdxH[IHalo] = HostArray1DI4("", NList[IHalo]);
+//      for (int IList = 0; IList < NList[IHalo]; ++IList) {
+//         IdxH[IHalo](IList) = List[IHalo][IList];
+//      }
 //      parallelFor({NList[IHalo]}, KOKKOS_LAMBDA(int IList) {
 //         Idx[IHalo](IList) = List[IHalo][IList];
 //      });
 //      NLstH(IHalo) = List[IHalo].size();
-      Idx[IHalo] = createDeviceMirrorCopy(IdxH[IHalo]);
-   }
+//      Idx[IHalo] = createDeviceMirrorCopy(IdxH[IHalo]);
+//   }
 
    // Set the index offsets for each halo layer
 //   Offsets[0] = 0;
@@ -1755,391 +1765,391 @@ int Halo::unpackBuffer(HostArray5DR8 &Array) {
                for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
                   for (int J = 0; J < NJ; ++J) {
                      I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
-                         MyNeighbor->RecvBuffer[IBuff];
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray5DR8
-
-//------------------------------------------------------------------------------
-// Initialize and construct the default Halo. MachEnv and Decomp must already
-// be initialized
-
-int HaloD::init() {
-
-   I4 IErr{0}; // error code
-
-   MachEnv *DefEnv   = MachEnv::getDefault();
-   Decomp *DefDecomp = Decomp::getDefault();
-
-   HaloD::DefaultHalo = create("Default", DefEnv, DefDecomp);
-
-   return IErr;
-
-} // End Halo init
-
-// Constructor
-//------------------------------------------------------------------------------
-// Construct a Halo for the input Name, MachEnv, and Decomp.
-
-HaloD::HaloD(const std::string &Name, const MachEnv *InEnv,
-           const Decomp *InDecomp) {
-
-   I4 IErr{0}; // error code
+					 MyList->Offsets[ILayer] + IExch) *
+					    NJ +
+					J;
+			     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
+				 MyNeighbor->RecvBuffer[IBuff];
+			  }
+		       }
+		    }
+		 }
+	      }
+	   }
+
+	   return 0;
+	} // end unpackBuffer HostArray5DR8
+
+	//------------------------------------------------------------------------------
+	// Initialize and construct the default Halo. MachEnv and Decomp must already
+	// be initialized
+
+	int HaloD::init() {
+
+	   I4 IErr{0}; // error code
+
+	   MachEnv *DefEnv   = MachEnv::getDefault();
+	   Decomp *DefDecomp = Decomp::getDefault();
+
+	   HaloD::DefaultHalo = create("Default", DefEnv, DefDecomp);
+
+	   return IErr;
+
+	} // End Halo init
+
+	// Constructor
+	//------------------------------------------------------------------------------
+	// Construct a Halo for the input Name, MachEnv, and Decomp.
+
+	HaloD::HaloD(const std::string &Name, const MachEnv *InEnv,
+		   const Decomp *InDecomp) {
+
+	   I4 IErr{0}; // error code
 
-   // Set pointer for the Decomp
-   MyDecomp = InDecomp;
+	   // Set pointer for the Decomp
+	   MyDecomp = InDecomp;
 
-   // Set member variable for the halo width
-   HaloWidth = MyDecomp->HaloWidth;
+	   // Set member variable for the halo width
+	   HaloWidth = MyDecomp->HaloWidth;
 
-   // Set local task ID and the MPI communicator
-   MyTask = InEnv->getMyTask();
-   MyComm = InEnv->getComm();
+	   // Set local task ID and the MPI communicator
+	   MyTask = InEnv->getMyTask();
+	   MyComm = InEnv->getComm();
 
-   // Fetch the total number of tasks
-   I4 NumTasks = InEnv->getNumTasks();
+	   // Fetch the total number of tasks
+	   I4 NumTasks = InEnv->getNumTasks();
 
-   // Declare 3D vectors to hold lists of indices generated below which are
-   // used to construct a Neighbor for each neighboring task
-   std::vector<std::vector<std::vector<I4>>> RecvCellLists;
-   std::vector<std::vector<std::vector<I4>>> SendCellLists;
-   std::vector<std::vector<std::vector<I4>>> RecvEdgeLists;
-   std::vector<std::vector<std::vector<I4>>> SendEdgeLists;
-   std::vector<std::vector<std::vector<I4>>> RecvVrtxLists;
-   std::vector<std::vector<std::vector<I4>>> SendVrtxLists;
+	   // Declare 3D vectors to hold lists of indices generated below which are
+	   // used to construct a Neighbor for each neighboring task
+	   std::vector<std::vector<std::vector<I4>>> RecvCellLists;
+	   std::vector<std::vector<std::vector<I4>>> SendCellLists;
+	   std::vector<std::vector<std::vector<I4>>> RecvEdgeLists;
+	   std::vector<std::vector<std::vector<I4>>> SendEdgeLists;
+	   std::vector<std::vector<std::vector<I4>>> RecvVrtxLists;
+	   std::vector<std::vector<std::vector<I4>>> SendVrtxLists;
 
-   // Determine which tasks are neighbors to the local task
-   IErr = determineNeighbors(NumTasks);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error determining neighbors");
+	   // Determine which tasks are neighbors to the local task
+	   IErr = determineNeighbors(NumTasks);
+	   if (IErr != 0)
+	      LOG_ERROR("Halo: Error determining neighbors");
 
-   // Generate the exchange lists for each neighboring task in each index space
-   IErr = generateExchangeLists(SendCellLists, RecvCellLists, OnCell);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Cells");
-   IErr = generateExchangeLists(SendEdgeLists, RecvEdgeLists, OnEdge);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Edges");
-   IErr = generateExchangeLists(SendVrtxLists, RecvVrtxLists, OnVertex);
-   if (IErr != 0)
-      LOG_ERROR("Halo: Error generating exchange lists for Vertices");
+	   // Generate the exchange lists for each neighboring task in each index space
+	   IErr = generateExchangeLists(SendCellLists, RecvCellLists, OnCell);
+	   if (IErr != 0)
+	      LOG_ERROR("Halo: Error generating exchange lists for Cells");
+	   IErr = generateExchangeLists(SendEdgeLists, RecvEdgeLists, OnEdge);
+	   if (IErr != 0)
+	      LOG_ERROR("Halo: Error generating exchange lists for Edges");
+	   IErr = generateExchangeLists(SendVrtxLists, RecvVrtxLists, OnVertex);
+	   if (IErr != 0)
+	      LOG_ERROR("Halo: Error generating exchange lists for Vertices");
 
-   // Construct the Neighbor objects and save them in class member Neighbors
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      Neighbors.push_back(NeighborD(SendCellLists[INghbr], SendEdgeLists[INghbr],
-                                   SendVrtxLists[INghbr], RecvCellLists[INghbr],
-                                   RecvEdgeLists[INghbr], RecvVrtxLists[INghbr],
-                                   NeighborList[INghbr]));
-   }
+	   // Construct the Neighbor objects and save them in class member Neighbors
+	   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+	      Neighbors.push_back(NeighborD(SendCellLists[INghbr], SendEdgeLists[INghbr],
+					   SendVrtxLists[INghbr], RecvCellLists[INghbr],
+					   RecvEdgeLists[INghbr], RecvVrtxLists[INghbr],
+					   NeighborList[INghbr]));
+	   }
 
-} // end Halo constructor
+	} // end Halo constructor
 
-/// Creates a new halo by calling the constructor and puts it in the AllHalos
-/// map
-HaloD *HaloD::create(const std::string &Name, const MachEnv *Env,
-                   const Decomp *Decomp) {
-   // Check to see if a halo of the same name already exists and
-   // if so, exit with an error
-   if (AllHalos.find(Name) != AllHalos.end()) {
-      LOG_ERROR("Attempted to create a Halo with name {} but a Halo of "
-                "that name already exists",
-                Name);
-      return nullptr;
-   }
+	/// Creates a new halo by calling the constructor and puts it in the AllHalos
+	/// map
+	HaloD *HaloD::create(const std::string &Name, const MachEnv *Env,
+			   const Decomp *Decomp) {
+	   // Check to see if a halo of the same name already exists and
+	   // if so, exit with an error
+	   if (AllHalos.find(Name) != AllHalos.end()) {
+	      LOG_ERROR("Attempted to create a Halo with name {} but a Halo of "
+			"that name already exists",
+			Name);
+	      return nullptr;
+	   }
 
-   // create a new halo on the heap and put it in a map of
-   // unique_ptrs, which will manage its lifetime
-   auto *NewHalo = new HaloD(Name, Env, Decomp);
-   AllHalos.emplace(Name, NewHalo);
+	   // create a new halo on the heap and put it in a map of
+	   // unique_ptrs, which will manage its lifetime
+	   auto *NewHalo = new HaloD(Name, Env, Decomp);
+	   AllHalos.emplace(Name, NewHalo);
 
-   return NewHalo;
-} // end Halo create
+	   return NewHalo;
+	} // end Halo create
 
-// Destructor
-//------------------------------------------------------------------------------
-// Destroy instance of Halo
+	// Destructor
+	//------------------------------------------------------------------------------
+	// Destroy instance of Halo
 
-HaloD::~HaloD() {
+	HaloD::~HaloD() {
 
-   // No operations necessary
+	   // No operations necessary
 
-} // end destructor
+	} // end destructor
 
-//------------------------------------------------------------------------------
-// Removes a Halo from AllHalos map and destroys it
+	//------------------------------------------------------------------------------
+	// Removes a Halo from AllHalos map and destroys it
 
-void HaloD::erase(std::string InName // name of Halo to remove
-) {
+	void HaloD::erase(std::string InName // name of Halo to remove
+	) {
 
-   AllHalos.erase(InName); // removes the Halo from the map and in
-                           // the process, calls the destructor
+	   AllHalos.erase(InName); // removes the Halo from the map and in
+				   // the process, calls the destructor
 
-} // end Halo erase
+	} // end Halo erase
 
-//------------------------------------------------------------------------------
-// Removes all Halos and destroys them
-
-void HaloD::clear() {
-
-   AllHalos.clear(); // removes all Halos from the map and in the
-                     // process, calls the destructor for each
-
-} // end Halo clear
-
-// Retrieval functions
-//------------------------------------------------------------------------------
-// Get default Halo
+	//------------------------------------------------------------------------------
+	// Removes all Halos and destroys them
+
+	void HaloD::clear() {
+
+	   AllHalos.clear(); // removes all Halos from the map and in the
+			     // process, calls the destructor for each
+
+	} // end Halo clear
+
+	// Retrieval functions
+	//------------------------------------------------------------------------------
+	// Get default Halo
 
-HaloD *HaloD::getDefault() { return HaloD::DefaultHalo; }
-
-//------------------------------------------------------------------------------
-// Get Halo by name
-
-HaloD *HaloD::get(const std::string Name // name of Halo to retrieve
-) {
+	HaloD *HaloD::getDefault() { return HaloD::DefaultHalo; }
+
+	//------------------------------------------------------------------------------
+	// Get Halo by name
+
+	HaloD *HaloD::get(const std::string Name // name of Halo to retrieve
+	) {
 
-   // look for an instance of this name
-   auto it = AllHalos.find(Name);
+	   // look for an instance of this name
+	   auto it = AllHalos.find(Name);
 
-   // if found, return the Halo pointer
-   if (it != AllHalos.end()) {
-      return it->second.get();
-   } else {
-      // otherwise print an error and retrun a null pointer
-      LOG_ERROR("Halo::get: Attempt to retrieve non-existent Halo:");
-      LOG_ERROR(" {} has not been defined or has been removed", Name);
-      return nullptr;
-   }
-} // end Halo get
-
-//------------------------------------------------------------------------------
-// Sets Halo class members NeighborList, NNghbr, SendFlags, and RecvFlags during
-// Halo construction
-
-int HaloD::determineNeighbors(const I4 NumTasks) {
-
-   I4 IErr{0}; // internal error code
-   I4 Err{0};  // error code to return
-
-   NeighborList.clear();
-
-   std::vector<I4> CellTasks;
-   std::vector<I4> EdgeTasks;
-   std::vector<I4> VertexTasks;
-
-   // create lists of tasks that own elements in the halo of the local task for
-   // each index space
-   generateListOfTasksInHalo(MyDecomp->NCellsOwned, MyDecomp->NCellsAll,
-                             MyDecomp->CellLocH, CellTasks);
-   generateListOfTasksInHalo(MyDecomp->NEdgesOwned, MyDecomp->NEdgesAll,
-                             MyDecomp->EdgeLocH, EdgeTasks);
-   generateListOfTasksInHalo(MyDecomp->NVerticesOwned, MyDecomp->NVerticesAll,
-                             MyDecomp->VertexLocH, VertexTasks);
-
-   std::vector<I4> UofCE;
-   std::vector<I4> UofCEV;
-
-   // union of the three sets results in a sorted list of IDs for all tasks that
-   // own at least one halo element in at least one index space
-   std::set_union(CellTasks.begin(), CellTasks.end(), EdgeTasks.begin(),
-                  EdgeTasks.end(), std::back_inserter(UofCE));
-   std::set_union(UofCE.begin(), UofCE.end(), VertexTasks.begin(),
-                  VertexTasks.end(), std::back_inserter(UofCEV));
-
-   std::vector<I4> HaloAll(NumTasks, 0);
-   std::vector<I4> OwnedAll(NumTasks, 0);
-
-   // set vector of flags for all tasks in MyComm which signals whether the
-   // halo for the local task needs elements from each task
-   for (int ITask = 0; ITask < UofCEV.size(); ++ITask) {
-      HaloAll[UofCEV[ITask]] = 1;
-   }
-
-   // perform all to all with all tasks in MyComm in order to determine if there
-   // are any tasks that need elements from the local task that the local task
-   // does not already consider a neighbor
-   IErr =
-       MPI_Alltoall(&HaloAll[0], 1, MPI_INT, &OwnedAll[0], 1, MPI_INT, MyComm);
-   if (IErr != 0) {
-      LOG_ERROR("Halo: MPI_Alltoall error");
-      Err = -1;
-   }
-
-   // set vector of IDs for all tasks that need locally owned elements for
-   // their halos
-   std::vector<I4> AddNeighbors;
-   for (int ITask = 0; ITask < NumTasks; ++ITask) {
-      if (OwnedAll[ITask])
-         AddNeighbors.push_back(ITask);
-   }
-
-   // one final union results in a list of IDs for all tasks that need to
-   // send elements to the local task or need locally owned elements during
-   // a halo exchange in at least one index space, save in Halo member
-   // vector NeighborList and set member variable NNghbr
-   std::set_union(UofCEV.begin(), UofCEV.end(), AddNeighbors.begin(),
-                  AddNeighbors.end(), std::back_inserter(NeighborList));
-   NNghbr = NeighborList.size();
-
-   // set SendFlags and RecvFlags for each index space
-   setNeighborFlags(CellTasks, OnCell);
-   setNeighborFlags(EdgeTasks, OnEdge);
-   setNeighborFlags(VertexTasks, OnVertex);
-
-   return Err;
-}
-
-//------------------------------------------------------------------------------
-// Using input decomposition info for a particular index space, generate a
-// sorted list of the tasks that own elements in the Halo of the local task
-
-int HaloD::generateListOfTasksInHalo(const I4 NOwned, const I4 NAll,
-                                    HostArray2DI4 Loc,
-                                    std::vector<I4> &ListOfTasks) {
-
-   I4 Err{0}; // error code to return
-
-   // search through halo elements in input Loc array to find each unique
-   // task ID and save in ListOfTasks
-   for (int Idx = NOwned; Idx < NAll; ++Idx) {
-      I4 Value = Loc(Idx, 0);
-      auto It  = std::find(ListOfTasks.begin(), ListOfTasks.end(), Value);
-      if (It == ListOfTasks.end())
-         ListOfTasks.push_back(Value);
-   }
-
-   std::sort(ListOfTasks.begin(), ListOfTasks.end());
-
-   return Err;
-}
-
-//------------------------------------------------------------------------------
-// For the input index space, set SendFlags and RecvFlags vectors that flag
-// which Neighbors in NeighborList the local task needs to send elements to or
-// receive elements from during a halo exchange
-
-int HaloD::setNeighborFlags(std::vector<I4> ListOfTasks,
-                           const MeshElement IdxSpace) {
-
-   I4 Err{0}; // error code to return
-
-   // allocate size of SendFlags and RecvFlags
-   SendFlags[IdxSpace].resize(NNghbr);
-   RecvFlags[IdxSpace].resize(NNghbr);
-
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      auto It = std::find(ListOfTasks.begin(), ListOfTasks.end(),
-                          NeighborList[INghbr]);
-      if (It != ListOfTasks.end()) {
-         RecvFlags[IdxSpace][INghbr] = 1;
-      } else {
-         RecvFlags[IdxSpace][INghbr] = 0;
-      }
-   }
-
-   // initialize vectors to track MPI errors for each MPI_Isend and MPI_IRecv
-   std::vector<I4> SendErr(NNghbr, 0);
-   std::vector<I4> RecvErr(NNghbr, 0);
-
-   // initialize vectors of MPI_Request variables to control non-blocking
-   // MPI communications
-   std::vector<MPI_Request> RecvReqs(NNghbr);
-   std::vector<MPI_Request> SendReqs(NNghbr);
-
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      RecvErr[INghbr] = MPI_Irecv(&SendFlags[IdxSpace][INghbr], 1, MPI_INT,
-                                  NeighborList[INghbr], MPI_ANY_TAG, MyComm,
-                                  &RecvReqs[INghbr]);
-      if (RecvErr[INghbr] != 0) {
-         LOG_ERROR("MPI error {} on task {} receive from task {}",
-                   RecvErr[INghbr], MyTask, NeighborList[INghbr]);
-         Err = -1;
-      }
-   }
-
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      SendErr[INghbr] =
-          MPI_Isend(&RecvFlags[IdxSpace][INghbr], 1, MPI_INT,
-                    NeighborList[INghbr], 0, MyComm, &SendReqs[INghbr]);
-      if (SendErr[INghbr] != 0) {
-         LOG_ERROR("MPI error {} on task {} send to task {}", SendErr[INghbr],
-                   MyTask, NeighborList[INghbr]);
-         Err = -1;
-      }
-   }
-
-   MPI_Waitall(NNghbr, SendReqs.data(), MPI_STATUS_IGNORE);
-   MPI_Waitall(NNghbr, RecvReqs.data(), MPI_STATUS_IGNORE);
-
-   return Err;
-}
-
-//------------------------------------------------------------------------------
-// Generate the lists of indices that are used to construct the ExchList
-// objects of the input index space for each Neighbor, and save the lists in
-// the input 3D vectors SendLists and RecvLists. The first dimension of these
-// vectors represent the task in the order they appear in NeighborList, and the
-// remaining 2D vector is passed to the Neighbor constructor for that
-// neighboring task.
-
-int HaloD::generateExchangeLists(
-    std::vector<std::vector<std::vector<I4>>> &SendLists,
-    std::vector<std::vector<std::vector<I4>>> &RecvLists,
-    const MeshElement IndexSpace) {
-
-   I4 IErr{0}; // error code
-
-   // Pointers to the needed info from the Decomp for the input index space
-   const I4 *NOwnedPtr{nullptr};
-   const I4 *NAllPtr{nullptr};
-   HostArray1DI4 NHaloPtr;
-   HostArray2DI4 LocPtr;
-
-   // Fetch the proper info for this index space
-   switch (IndexSpace) {
-   case OnCell:
-      NOwnedPtr = &MyDecomp->NCellsOwned;
-      NAllPtr   = &MyDecomp->NCellsAll;
-      NHaloPtr  = MyDecomp->NCellsHaloH;
-      LocPtr    = MyDecomp->CellLocH;
-      NumLayers = HaloWidth;
-
-      break;
-   case OnEdge:
-      NOwnedPtr = &MyDecomp->NEdgesOwned;
-      NAllPtr   = &MyDecomp->NEdgesAll;
-      NHaloPtr  = MyDecomp->NEdgesHaloH;
-      LocPtr    = MyDecomp->EdgeLocH;
-      NumLayers = HaloWidth + 1;
-
-      break;
-   case OnVertex:
-      NOwnedPtr = &MyDecomp->NVerticesOwned;
-      NAllPtr   = &MyDecomp->NVerticesAll;
-      NHaloPtr  = MyDecomp->NVerticesHaloH;
-      LocPtr    = MyDecomp->VertexLocH;
-      NumLayers = HaloWidth + 1;
-
-      break;
-   }
-
-   // Save the indices that define the bounds of each halo layer
-   std::vector<I4> HaloBnds{*NOwnedPtr};
-   for (int ILayer = 0; ILayer < HaloWidth; ++ILayer) {
-      HaloBnds.push_back(NHaloPtr(ILayer));
-   }
-   if (IndexSpace != OnCell)
-      HaloBnds.push_back(*NAllPtr);
+	   // if found, return the Halo pointer
+	   if (it != AllHalos.end()) {
+	      return it->second.get();
+	   } else {
+	      // otherwise print an error and retrun a null pointer
+	      LOG_ERROR("Halo::get: Attempt to retrieve non-existent Halo:");
+	      LOG_ERROR(" {} has not been defined or has been removed", Name);
+	      return nullptr;
+	   }
+	} // end Halo get
+
+	//------------------------------------------------------------------------------
+	// Sets Halo class members NeighborList, NNghbr, SendFlags, and RecvFlags during
+	// Halo construction
+
+	int HaloD::determineNeighbors(const I4 NumTasks) {
+
+	   I4 IErr{0}; // internal error code
+	   I4 Err{0};  // error code to return
+
+	   NeighborList.clear();
+
+	   std::vector<I4> CellTasks;
+	   std::vector<I4> EdgeTasks;
+	   std::vector<I4> VertexTasks;
+
+	   // create lists of tasks that own elements in the halo of the local task for
+	   // each index space
+	   generateListOfTasksInHalo(MyDecomp->NCellsOwned, MyDecomp->NCellsAll,
+				     MyDecomp->CellLocH, CellTasks);
+	   generateListOfTasksInHalo(MyDecomp->NEdgesOwned, MyDecomp->NEdgesAll,
+				     MyDecomp->EdgeLocH, EdgeTasks);
+	   generateListOfTasksInHalo(MyDecomp->NVerticesOwned, MyDecomp->NVerticesAll,
+				     MyDecomp->VertexLocH, VertexTasks);
+
+	   std::vector<I4> UofCE;
+	   std::vector<I4> UofCEV;
+
+	   // union of the three sets results in a sorted list of IDs for all tasks that
+	   // own at least one halo element in at least one index space
+	   std::set_union(CellTasks.begin(), CellTasks.end(), EdgeTasks.begin(),
+			  EdgeTasks.end(), std::back_inserter(UofCE));
+	   std::set_union(UofCE.begin(), UofCE.end(), VertexTasks.begin(),
+			  VertexTasks.end(), std::back_inserter(UofCEV));
+
+	   std::vector<I4> HaloAll(NumTasks, 0);
+	   std::vector<I4> OwnedAll(NumTasks, 0);
+
+	   // set vector of flags for all tasks in MyComm which signals whether the
+	   // halo for the local task needs elements from each task
+	   for (int ITask = 0; ITask < UofCEV.size(); ++ITask) {
+	      HaloAll[UofCEV[ITask]] = 1;
+	   }
+
+	   // perform all to all with all tasks in MyComm in order to determine if there
+	   // are any tasks that need elements from the local task that the local task
+	   // does not already consider a neighbor
+	   IErr =
+	       MPI_Alltoall(&HaloAll[0], 1, MPI_INT, &OwnedAll[0], 1, MPI_INT, MyComm);
+	   if (IErr != 0) {
+	      LOG_ERROR("Halo: MPI_Alltoall error");
+	      Err = -1;
+	   }
+
+	   // set vector of IDs for all tasks that need locally owned elements for
+	   // their halos
+	   std::vector<I4> AddNeighbors;
+	   for (int ITask = 0; ITask < NumTasks; ++ITask) {
+	      if (OwnedAll[ITask])
+		 AddNeighbors.push_back(ITask);
+	   }
+
+	   // one final union results in a list of IDs for all tasks that need to
+	   // send elements to the local task or need locally owned elements during
+	   // a halo exchange in at least one index space, save in Halo member
+	   // vector NeighborList and set member variable NNghbr
+	   std::set_union(UofCEV.begin(), UofCEV.end(), AddNeighbors.begin(),
+			  AddNeighbors.end(), std::back_inserter(NeighborList));
+	   NNghbr = NeighborList.size();
+
+	   // set SendFlags and RecvFlags for each index space
+	   setNeighborFlags(CellTasks, OnCell);
+	   setNeighborFlags(EdgeTasks, OnEdge);
+	   setNeighborFlags(VertexTasks, OnVertex);
+
+	   return Err;
+	}
+
+	//------------------------------------------------------------------------------
+	// Using input decomposition info for a particular index space, generate a
+	// sorted list of the tasks that own elements in the Halo of the local task
+
+	int HaloD::generateListOfTasksInHalo(const I4 NOwned, const I4 NAll,
+					    HostArray2DI4 Loc,
+					    std::vector<I4> &ListOfTasks) {
+
+	   I4 Err{0}; // error code to return
+
+	   // search through halo elements in input Loc array to find each unique
+	   // task ID and save in ListOfTasks
+	   for (int Idx = NOwned; Idx < NAll; ++Idx) {
+	      I4 Value = Loc(Idx, 0);
+	      auto It  = std::find(ListOfTasks.begin(), ListOfTasks.end(), Value);
+	      if (It == ListOfTasks.end())
+		 ListOfTasks.push_back(Value);
+	   }
+
+	   std::sort(ListOfTasks.begin(), ListOfTasks.end());
+
+	   return Err;
+	}
+
+	//------------------------------------------------------------------------------
+	// For the input index space, set SendFlags and RecvFlags vectors that flag
+	// which Neighbors in NeighborList the local task needs to send elements to or
+	// receive elements from during a halo exchange
+
+	int HaloD::setNeighborFlags(std::vector<I4> ListOfTasks,
+				   const MeshElement IdxSpace) {
+
+	   I4 Err{0}; // error code to return
+
+	   // allocate size of SendFlags and RecvFlags
+	   SendFlags[IdxSpace].resize(NNghbr);
+	   RecvFlags[IdxSpace].resize(NNghbr);
+
+	   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+	      auto It = std::find(ListOfTasks.begin(), ListOfTasks.end(),
+				  NeighborList[INghbr]);
+	      if (It != ListOfTasks.end()) {
+		 RecvFlags[IdxSpace][INghbr] = 1;
+	      } else {
+		 RecvFlags[IdxSpace][INghbr] = 0;
+	      }
+	   }
+
+	   // initialize vectors to track MPI errors for each MPI_Isend and MPI_IRecv
+	   std::vector<I4> SendErr(NNghbr, 0);
+	   std::vector<I4> RecvErr(NNghbr, 0);
+
+	   // initialize vectors of MPI_Request variables to control non-blocking
+	   // MPI communications
+	   std::vector<MPI_Request> RecvReqs(NNghbr);
+	   std::vector<MPI_Request> SendReqs(NNghbr);
+
+	   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+	      RecvErr[INghbr] = MPI_Irecv(&SendFlags[IdxSpace][INghbr], 1, MPI_INT,
+					  NeighborList[INghbr], MPI_ANY_TAG, MyComm,
+					  &RecvReqs[INghbr]);
+	      if (RecvErr[INghbr] != 0) {
+		 LOG_ERROR("MPI error {} on task {} receive from task {}",
+			   RecvErr[INghbr], MyTask, NeighborList[INghbr]);
+		 Err = -1;
+	      }
+	   }
+
+	   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+	      SendErr[INghbr] =
+		  MPI_Isend(&RecvFlags[IdxSpace][INghbr], 1, MPI_INT,
+			    NeighborList[INghbr], 0, MyComm, &SendReqs[INghbr]);
+	      if (SendErr[INghbr] != 0) {
+		 LOG_ERROR("MPI error {} on task {} send to task {}", SendErr[INghbr],
+			   MyTask, NeighborList[INghbr]);
+		 Err = -1;
+	      }
+	   }
+
+	   MPI_Waitall(NNghbr, SendReqs.data(), MPI_STATUS_IGNORE);
+	   MPI_Waitall(NNghbr, RecvReqs.data(), MPI_STATUS_IGNORE);
+
+	   return Err;
+	}
+
+	//------------------------------------------------------------------------------
+	// Generate the lists of indices that are used to construct the ExchList
+	// objects of the input index space for each Neighbor, and save the lists in
+	// the input 3D vectors SendLists and RecvLists. The first dimension of these
+	// vectors represent the task in the order they appear in NeighborList, and the
+	// remaining 2D vector is passed to the Neighbor constructor for that
+	// neighboring task.
+
+	int HaloD::generateExchangeLists(
+	    std::vector<std::vector<std::vector<I4>>> &SendLists,
+	    std::vector<std::vector<std::vector<I4>>> &RecvLists,
+	    const MeshElement IndexSpace) {
+
+	   I4 IErr{0}; // error code
+
+	   // Pointers to the needed info from the Decomp for the input index space
+	   const I4 *NOwnedPtr{nullptr};
+	   const I4 *NAllPtr{nullptr};
+	   HostArray1DI4 NHaloPtr;
+	   HostArray2DI4 LocPtr;
+
+	   // Fetch the proper info for this index space
+	   switch (IndexSpace) {
+	   case OnCell:
+	      NOwnedPtr = &MyDecomp->NCellsOwned;
+	      NAllPtr   = &MyDecomp->NCellsAll;
+	      NHaloPtr  = MyDecomp->NCellsHaloH;
+	      LocPtr    = MyDecomp->CellLocH;
+	      NumLayers = HaloWidth;
+
+	      break;
+	   case OnEdge:
+	      NOwnedPtr = &MyDecomp->NEdgesOwned;
+	      NAllPtr   = &MyDecomp->NEdgesAll;
+	      NHaloPtr  = MyDecomp->NEdgesHaloH;
+	      LocPtr    = MyDecomp->EdgeLocH;
+	      NumLayers = HaloWidth + 1;
+
+	      break;
+	   case OnVertex:
+	      NOwnedPtr = &MyDecomp->NVerticesOwned;
+	      NAllPtr   = &MyDecomp->NVerticesAll;
+	      NHaloPtr  = MyDecomp->NVerticesHaloH;
+	      LocPtr    = MyDecomp->VertexLocH;
+	      NumLayers = HaloWidth + 1;
+
+	      break;
+	   }
+
+	   // Save the indices that define the bounds of each halo layer
+	   std::vector<I4> HaloBnds{*NOwnedPtr};
+	   for (int ILayer = 0; ILayer < HaloWidth; ++ILayer) {
+	      HaloBnds.push_back(NHaloPtr(ILayer));
+	   }
+	   if (IndexSpace != OnCell)
+	      HaloBnds.push_back(*NAllPtr);
 
    // Determine the number of halo elements owned by each neighbor in each
    // layer of the halo.
@@ -2304,26 +2314,13 @@ int HaloD::startReceives(bool DeviceArray) {
 
    I4 Err{0}; // Error code to return
 
-//   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
-//                          (CurMemSpace == ArrayMemLoc::Both);
-
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
       if (RecvFlags[CurElem][INghbr]) {
-//         auto *LocNeighbor = &Neighbors[INghbr];
          auto & LocNeighbor = Neighbors[INghbr];
-//         I4 BufferSize = TotSize * MyNeighbor->RecvLists[CurElem].NTot;
+
          I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
-//         MyNeighbor->RecvBuffer.resize(BufferSize);
-//         Kokkos::resize(MyNeighbor->RecvBuff, BufferSize);
+
          void* DataPtr{nullptr};
-//         if (DeviceArray) {
-////            std::cout << INghbr << " " << BufferSize << " " << Neighbors[INghbr].RecvBuff.span_is_contiguous() << std::endl;
-//            Kokkos::resize(LocNeighbor.RecvBuff, BufferSize);
-//            DataPtr = LocNeighbor.RecvBuff.data();
-//         } else {
-//            Kokkos::resize(LocNeighbor.RecvBuffH, BufferSize);
-//            DataPtr = LocNeighbor.RecvBuffH.data();
-//         }
 
          if (DeviceArray && MpiOnDev) {
             Kokkos::resize(LocNeighbor.RecvBuff, BufferSize);
@@ -2333,15 +2330,6 @@ int HaloD::startReceives(bool DeviceArray) {
             DataPtr = LocNeighbor.RecvBuffH.data();
          }
 
-//         Neighbors[INghbr].RecvBuffer.resize(BufferSize);
-//         std::vector<R8> RecvBuffer(BufferSize);
-//         const auto &LocBuff = Neighbors[INghbr].RecvBuff;
-//         IErr[INghbr] = MPI_Irecv(&MyNeighbor->RecvBuffer[0], BufferSize,
-//         IErr[INghbr] = MPI_Irecv(MyNeighbor->RecvBuff.data(), BufferSize,
-//         IErr[INghbr] = MPI_Irecv(LocBuff.data(), BufferSize,
-//         IErr[INghbr] = MPI_Irecv(Neighbors[INghbr].RecvBuff.data(), BufferSize,
-//         IErr[INghbr] = MPI_Irecv(&Neighbors[INghbr].RecvBuffer[0], BufferSize,
-//         IErr[INghbr] = MPI_Irecv(&RecvBuffer[0], BufferSize,
          IErr[INghbr] = MPI_Irecv(DataPtr, BufferSize,
                                   MPI_DOUBLE, LocNeighbor.TaskID, MPI_ANY_TAG,
                                   MyComm, &LocNeighbor.RReq);
@@ -2368,25 +2356,12 @@ int HaloD::startSends(const bool DeviceArray
 
    I4 Err{0}; // Error code to return
 
-//   const bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
-//                          (CurMemSpace == ArrayMemLoc::Both);
-//   static bool ExchOnDev = (CurMemSpace == ArrayMemLoc::Device) || 
-//                           (CurMemSpace == ArrayMemLoc::Both);
-//
-//   using LocBuffType = std::conditional<ExchOnDev, Array1DR8, HostArray1DR8>::type;
-
    if (DeviceArray) Kokkos::fence();
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
       if (SendFlags[CurElem][INghbr]) {
-//         auto *LocNeighbor = &Neighbors[INghbr];
          auto &LocNeighbor = Neighbors[INghbr];
          void* DataPtr{nullptr};
-//         if (DeviceArray) {
-//            DataPtr = LocNeighbor.SendBuff.data();
-//         } else {
-//            DataPtr = LocNeighbor.SendBuffH.data();
-//         }
          I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
 
          if (DeviceArray) {
@@ -2401,34 +2376,8 @@ int HaloD::startSends(const bool DeviceArray
             DataPtr = LocNeighbor.SendBuffH.data();
          }
 
-//         MyNeighbor    = &Neighbors[INghbr];
-//         if (CurMemSpace == ArrayMemLoc::Device ||
-//             CurMemSpace == ArrayMemLoc::Both) {
-//            const auto &LocBuff = LocNeighbor.SendBuff;
-//         } else {
-//            const auto &LocBuff = Neighbors[INghbr].SendBuffH;
-//         }
-//         std::vector<R8> SendBuffer(BufferSize);
-//         MPI_Isend(Neighbors[INghbr].SendBuff.data(), BufferSize, MPI_DOUBLE,
-//         MPI_Isend(&Neighbors[INghbr].SendBuffer, BufferSize, MPI_DOUBLE,
-//         MPI_Isend(&SendBuffer[0], BufferSize, MPI_DOUBLE,
          MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
                    LocNeighbor.TaskID, 0, MyComm, &LocNeighbor.SReq);
-//         if (ExchOnDev) {
-//            const auto &LocBuff = Neighbors[INghbr].SendBuff;
-//            IErr[INghbr] = 
-////             MPI_Isend(&MyNeighbor->SendBuffer[0], BufferSize, MPI_RealKind,
-////             MPI_Isend(MyNeighbor->SendBuff.data(), BufferSize, MPI_RealKind,
-//                MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
-////                MPI_Isend(LocBuff.data(), BufferSize, MPI_RealKind,
-//                          MyNeighbor->TaskID, 0, MyComm, &MyNeighbor->SReq);
-//         } else {
-//            const auto &LocBuffH = Neighbors[INghbr].SendBuffH;
-//            IErr[INghbr] = 
-//                MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
-////                MPI_Isend(LocBuffH.data(), BufferSize, MPI_RealKind,
-//                          MyNeighbor->TaskID, 0, MyComm, &MyNeighbor->SReq);
-//         }
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} send to task {}", IErr[INghbr],
                       MyTask, LocNeighbor.TaskID);
@@ -2439,1070 +2388,6 @@ int HaloD::startSends(const bool DeviceArray
 
    return Err;
 } // end startSends
-
-//------------------------------------------------------------------------------
-// The packBuffer function is overloaded to all supported data types. First, the
-// send buffer for the neighbor is allocated with enough space to send all the
-// halo elements. Then the exchange list for the neighbor and index space
-// is used to select the proper elements and pack them into the send buffer.
-// In multidimensional arrays the second fastest index (second index from the
-// right) is the mesh element dimension. For integer arrays, the value is
-// recast as a Real in a bit-preserving manner using reinterpret_cast to pack
-// into the buffer, which is of type std::vector<Real>.
-////int HaloD::packBuffer(const Array1DI4 &Array) {
-////
-//////   const ExchListD *LocList = &MyNeighbor->SendLists[CurElem];
-////   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-////   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
-////
-//////   LocNeighbor.SendBuffer.resize(LocList.NTot);
-////
-//////   Array1DR8 LocBuff("SendBuffer", LocList.NTot);
-////   const auto &LocArray = Array;
-//////   std::vector<I4> LocInd;
-//////   LocInd.resize(LocList.NTot);
-////   const auto &LocIndex = LocList.Index;
-//////   Array1DI4 LocIndices("LocIndices", LocList.NTot);
-////
-//////   std::cout << "PackBuffer " << MyTask << " " << LocNeighbor.TaskID << " : " << LocList.NTot << " " << LocArray.size() << " " << LocBuff.size() <<  std::endl;
-//////   std::cout << "pack buffer" << std::endl;
-//////   auto ArrayH = createHostMirrorCopy(Array);
-////
-//////   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//////      const auto &LocOffs = LocList.Offs;
-//////      const auto &LocIdx = LocList.Idx[ILayer];
-//////      for (int IExch = 0; IExch < LocList.NList[ILayer]; ++IExch) {
-//////         I4 IBuff = LocList.Offsets[ILayer] + IExch;
-//////         LocInd[IBuff] = LocList.Ind[ILayer][IExch];
-////////         I4 IBuff = LocList.Offs(ILayer) + IExch;
-//////         LocNeighbor.SendBuffer[IBuff] =
-////////         LocNeighbor.SendBuff(IBuff) =
-//////             reinterpret_cast<R8 &>(ArrayH(LocList.Ind[ILayer][IExch]));
-////////             reinterpret_cast<Real &>(Array(LocList.Idx[ILayer](IExch)));
-//////      }
-//////      auto NList_ = LocList.NList[ILayer];
-////////      const I4 IOffset = LocList.Offsets[ILayer];
-////////      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
-//////////         packBuff(LocBuff, IOffset, IExch, LocIdx, LocArray);
-//////////         const I4 IBuff = LocList.Offs(ILayer) + IExch;
-////////         const I4 IBuff = IOffset + IExch;
-////////         const I4 IArr = LocIdx(IExch);
-//////////         I4 Val = LocArray(IArr);
-////////         auto Val = LocArray(LocIdx(IExch));
-////////         const R8 RVal = reinterpret_cast<R8 &>(Val);
-//////////         R8 RVal = reinterpret_cast<R8 &>(LocArray(IArr));
-//////////         LocIndices(IBuff) = IArr;
-//////////         LocNeighbor.SendBuff(IBuff) =
-////////         LocBuff(IBuff) = //0;
-////////            RVal;
-//////////            reinterpret_cast<R8 &>(LocArray(IArr));
-//////////            reinterpret_cast<R8 &>(LocArray(LocIdx(IExch)));
-////////      });
-////////   }
-////
-////   if (CurMemSpace == ArrayMemLoc::Device || CurMemSpace == ArrayMemLoc::Both) { 
-////      Kokkos::resize(LocNeighbor.SendBuff, LocList.NTot);
-////      const auto &LocBuff = Neighbors[CurNeighbor].SendBuff;
-////
-////      parallelFor({LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
-////         auto Val = LocArray(LocIndex(IExch));
-////         const R8 RVal = reinterpret_cast<R8 &>(Val);
-////         LocBuff(IExch) = RVal;
-////      });
-////
-////   } else {
-//////      Kokkos::resize(LocNeighbor.SendBuffH, LocList.NTot);
-//////      const auto &LocBuffH = Neighbors[CurNeighbor].SendBuffH;
-//////      for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
-//////         
-//////      }
-////   }
-////
-////
-////   std::cout << " buffer packed" << std::endl;
-////   Kokkos::fence();
-////
-//////   deepCopy(LocNeighbor.SendBuff, LocBuff);
-//////   auto PackedBuff = createHostMirrorCopy(LocNeighbor.SendBuff);
-//////   auto PackedBuff = createHostMirrorCopy(LocBuff);
-//////   auto HostIndices = createHostMirrorCopy(LocIndices);
-////
-//////   FILE *fptr;
-//////   char filename[32];
-//////   sprintf(filename, "out%d_%d.dat", MyTask, LocNeighbor.TaskID);
-//////   fptr = fopen(filename, "w");
-//////
-////////   for ( int ILayer = 0; ILayer < NumLayers ; ++ILayer) {
-////////      const auto &LocIdx = LocList.Idx[ILayer];
-////////      auto IdxMirr = createHostMirrorCopy(LocIdx);
-////////      for ( int IList = 0; IList < LocList.NList[ILayer] ; ++IList) {
-////////         fprintf(fptr, "%8d %8d %8d %8d\n", ILayer, IList, LocList.Ind[ILayer][IList],
-////////         IdxMirr(IList));
-////////      }
-////////   }
-//////   for (int I = 0; I < LocList.NTot; ++I) {
-////////      fprintf(fptr, "%8d %8d %8d\n", I, LocInd[I], HostIndices(I));
-//////      fprintf(fptr, "%8d %8d %8d\n", I, reinterpret_cast<I4 &>(LocNeighbor.SendBuffer[I]),
-//////              reinterpret_cast<I4 &>(PackedBuff(I)));
-//////   }
-//////
-//////   fclose(fptr);
-////   std::cout << "end packBuffer routine" << std::endl;
-////   return 0;
-////} // end packBuffer HostArray1DI4
-/*
-int HaloD::packBuffer(const HostArray1DI8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff = MyList->Offsets[ILayer] + IExch;
-         MyNeighbor->SendBuffer[IBuff] =
-             reinterpret_cast<Real &>(Array(MyList->Ind[ILayer][IExch]));
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray1DI8
-
-int HaloD::packBuffer(const HostArray1DR4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff                      = MyList->Offsets[ILayer] + IExch;
-         MyNeighbor->SendBuffer[IBuff] = Array(MyList->Ind[ILayer][IExch]);
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray1DR4
-
-int HaloD::packBuffer(const HostArray1DR8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff                      = MyList->Offsets[ILayer] + IExch;
-         MyNeighbor->SendBuffer[IBuff] = Array(MyList->Ind[ILayer][IExch]);
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray1DR8
-
-int HaloD::packBuffer(const HostArray2DI4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            MyNeighbor->SendBuffer[IBuff] =
-                reinterpret_cast<Real &>(Array(MyList->Ind[ILayer][IExch], J));
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray2DI4
-
-int HaloD::packBuffer(const HostArray2DI8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            MyNeighbor->SendBuffer[IBuff] =
-                reinterpret_cast<Real &>(Array(MyList->Ind[ILayer][IExch], J));
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray2DI8
-
-int HaloD::packBuffer(const HostArray2DR4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            MyNeighbor->SendBuffer[IBuff] =
-                Array(MyList->Ind[ILayer][IExch], J);
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray2DR4
-
-int HaloD::packBuffer(const HostArray2DR8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            MyNeighbor->SendBuffer[IBuff] =
-                Array(MyList->Ind[ILayer][IExch], J);
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray2DR8
-
-int HaloD::packBuffer(const HostArray3DI4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                   Array(K, MyList->Ind[ILayer][IExch], J));
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray3DI4
-
-int HaloD::packBuffer(const HostArray3DI8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                   Array(K, MyList->Ind[ILayer][IExch], J));
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray3DI8
-
-int HaloD::packBuffer(const HostArray3DR4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               MyNeighbor->SendBuffer[IBuff] =
-                   Array(K, MyList->Ind[ILayer][IExch], J);
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray3DR4
-
-int HaloD::packBuffer(const HostArray3DR8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               MyNeighbor->SendBuffer[IBuff] =
-                   Array(K, MyList->Ind[ILayer][IExch], J);
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray3DR8
-
-int HaloD::packBuffer(const HostArray4DI4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                      Array(L, K, MyList->Ind[ILayer][IExch], J));
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray4DI4
-
-int HaloD::packBuffer(const HostArray4DI8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                      Array(L, K, MyList->Ind[ILayer][IExch], J));
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray4DI8
-
-int HaloD::packBuffer(const HostArray4DR4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  MyNeighbor->SendBuffer[IBuff] =
-                      Array(L, K, MyList->Ind[ILayer][IExch], J);
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray4DR4
-
-int HaloD::packBuffer(const HostArray4DR8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  MyNeighbor->SendBuffer[IBuff] =
-                      Array(L, K, MyList->Ind[ILayer][IExch], J);
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray4DR8
-
-int HaloD::packBuffer(const HostArray5DI4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            for (int K = 0; K < NK; ++K) {
-               for (int L = 0; L < NL; ++L) {
-                  for (int M = 0; M < NM; ++M) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                         Array(M, L, K, MyList->Ind[ILayer][IExch], J));
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray5DI4
-
-int HaloD::packBuffer(const HostArray5DI8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     MyNeighbor->SendBuffer[IBuff] = reinterpret_cast<Real &>(
-                         Array(M, L, K, MyList->Ind[ILayer][IExch], J));
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray5DI8
-
-int HaloD::packBuffer(const HostArray5DR4 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     MyNeighbor->SendBuffer[IBuff] =
-                         Array(M, L, K, MyList->Ind[ILayer][IExch], J);
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray5DR4
-
-int HaloD::packBuffer(const HostArray5DR8 Array) {
-
-   ExchListD *MyList = &MyNeighbor->SendLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   MyNeighbor->SendBuffer.resize(MyList->NTot * TotSize);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     MyNeighbor->SendBuffer[IBuff] =
-                         Array(M, L, K, MyList->Ind[ILayer][IExch], J);
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end packBuffer HostArray5DR8
-*/
-//------------------------------------------------------------------------------
-// The unpackBuffer function is overloaded to all supported data types. After
-// a message has been received from a neighboring task, the RecvList for the
-// corresponding Neighbor and index space is used to save the elements of the
-// receive buffer in their proper locations in the input Array. In multi-
-// dimensional arrays the second fastest index (second index from the
-// right) is the mesh element dimension. For integer arrays, the value from
-// the buffer is recast in a bit-preserving manner from a Real to the proper
-// integer type (I4 or I8) using reinterpret_cast, and then saved in the
-// input Array.
-
-////int HaloD::unpackBuffer(Array1DI4 &Array) {
-////
-//////   std::cout << "unpack buffer" << std::endl;
-//////   const ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-////   OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-////   OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
-////   const auto &LocArray = Array;
-////   const auto &LocBuff = Neighbors[CurNeighbor].RecvBuff;
-////
-////   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-//////      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-////////         I4 IBuff = MyList->Offsets[ILayer] + IExch;
-//////         I4 IBuff = MyList->Offs(ILayer) + IExch;
-////////       Array(MyList->Ind[ILayer][IExch]) =
-//////         Array(MyList->Idx[ILayer](IExch)) =
-//////             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
-//////      }
-////      const auto &LocIdx = LocList.Idx[ILayer];
-////      const I4 IOffset = LocList.Offsets[ILayer];
-////      parallelFor({LocList.NList[ILayer]}, KOKKOS_LAMBDA(int IExch) {
-//////         const I4 IBuff = LocList->Offs(ILayer) + IExch;
-////         const I4 IBuff = IOffset + IExch;
-////         const I4 IArr = LocIdx(IExch);
-//////         Array(LocList->Idx[ILayer](IExch)) =
-//////             reinterpret_cast<I4 &>(MyNeighbor->RecvBuff(IBuff));
-////         LocArray(IArr) = 
-////             reinterpret_cast<I4 &>(LocBuff(IBuff));
-////      });
-////   }
-////
-////   return 0;
-////} // end unpackBuffer HostArray1DI4
-/*
-int HaloD::unpackBuffer(HostArray1DI8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff = MyList->Offsets[ILayer] + IExch;
-         Array(MyList->Ind[ILayer][IExch]) =
-             reinterpret_cast<I8 &>(MyNeighbor->RecvBuffer[IBuff]);
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray1DI8
-
-int HaloD::unpackBuffer(HostArray1DR4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff                          = MyList->Offsets[ILayer] + IExch;
-         Array(MyList->Ind[ILayer][IExch]) = MyNeighbor->RecvBuffer[IBuff];
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray1DR4
-
-int HaloD::unpackBuffer(HostArray1DR8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         I4 IBuff                          = MyList->Offsets[ILayer] + IExch;
-         Array(MyList->Ind[ILayer][IExch]) = MyNeighbor->RecvBuffer[IBuff];
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray1DR8
-
-int HaloD::unpackBuffer(HostArray2DI4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            Array(MyList->Ind[ILayer][IExch], J) =
-                reinterpret_cast<I4 &>(MyNeighbor->RecvBuffer[IBuff]);
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray2DI4
-
-int HaloD::unpackBuffer(HostArray2DI8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            Array(MyList->Ind[ILayer][IExch], J) =
-                reinterpret_cast<I8 &>(MyNeighbor->RecvBuffer[IBuff]);
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray2DI8
-
-int HaloD::unpackBuffer(HostArray2DR4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            Array(MyList->Ind[ILayer][IExch], J) =
-                MyNeighbor->RecvBuffer[IBuff];
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray2DR4
-
-int HaloD::unpackBuffer(HostArray2DR8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NJ           = Array.extent(1);
-
-   for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-      for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-         for (int J = 0; J < NJ; ++J) {
-            I4 IBuff = (MyList->Offsets[ILayer] + IExch) * NJ + J;
-            Array(MyList->Ind[ILayer][IExch], J) =
-                MyNeighbor->RecvBuffer[IBuff];
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray2DR8
-
-int HaloD::unpackBuffer(HostArray3DI4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               Array(K, MyList->Ind[ILayer][IExch], J) =
-                   reinterpret_cast<I4 &>(MyNeighbor->RecvBuffer[IBuff]);
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray3DI4
-
-int HaloD::unpackBuffer(HostArray3DI8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               Array(K, MyList->Ind[ILayer][IExch], J) =
-                   reinterpret_cast<I8 &>(MyNeighbor->RecvBuffer[IBuff]);
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray3DI8
-
-int HaloD::unpackBuffer(HostArray3DR4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               Array(K, MyList->Ind[ILayer][IExch], J) =
-                   MyNeighbor->RecvBuffer[IBuff];
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray3DR4
-
-int HaloD::unpackBuffer(HostArray3DR8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NK           = Array.extent(0);
-   int NJ           = Array.extent(2);
-
-   for (int K = 0; K < NK; ++K) {
-      for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-         for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-            for (int J = 0; J < NJ; ++J) {
-               I4 IBuff =
-                   (K * MyList->NTot + MyList->Offsets[ILayer] + IExch) * NJ +
-                   J;
-               Array(K, MyList->Ind[ILayer][IExch], J) =
-                   MyNeighbor->RecvBuffer[IBuff];
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray3DR8
-
-int HaloD::unpackBuffer(HostArray4DI4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  Array(L, K, MyList->Ind[ILayer][IExch], J) =
-                      reinterpret_cast<I4 &>(MyNeighbor->RecvBuffer[IBuff]);
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray4DI4
-
-int HaloD::unpackBuffer(HostArray4DI8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  Array(L, K, MyList->Ind[ILayer][IExch], J) =
-                      reinterpret_cast<I8 &>(MyNeighbor->RecvBuffer[IBuff]);
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray4DI8
-
-int HaloD::unpackBuffer(HostArray4DR4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  Array(L, K, MyList->Ind[ILayer][IExch], J) =
-                      MyNeighbor->RecvBuffer[IBuff];
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray4DR4
-
-int HaloD::unpackBuffer(HostArray4DR8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NL           = Array.extent(0);
-   int NK           = Array.extent(1);
-   int NJ           = Array.extent(3);
-
-   for (int L = 0; L < NL; ++L) {
-      for (int K = 0; K < NK; ++K) {
-         for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-            for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-               for (int J = 0; J < NJ; ++J) {
-                  I4 IBuff = ((L * NK + K) * MyList->NTot +
-                              MyList->Offsets[ILayer] + IExch) *
-                                 NJ +
-                             J;
-                  Array(L, K, MyList->Ind[ILayer][IExch], J) =
-                      MyNeighbor->RecvBuffer[IBuff];
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray4DR8
-
-int HaloD::unpackBuffer(HostArray5DI4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
-                         reinterpret_cast<I4 &>(MyNeighbor->RecvBuffer[IBuff]);
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray5DI4
-
-int HaloD::unpackBuffer(HostArray5DI8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
-                         reinterpret_cast<I8 &>(MyNeighbor->RecvBuffer[IBuff]);
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray5DI8
-
-int HaloD::unpackBuffer(HostArray5DR4 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
-                         MyNeighbor->RecvBuffer[IBuff];
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray5DR4
-
-int HaloD::unpackBuffer(HostArray5DR8 &Array) {
-
-   ExchListD *MyList = &MyNeighbor->RecvLists[CurElem];
-   int NM           = Array.extent(0);
-   int NL           = Array.extent(1);
-   int NK           = Array.extent(2);
-   int NJ           = Array.extent(4);
-
-   for (int M = 0; M < NM; ++M) {
-      for (int L = 0; L < NL; ++L) {
-         for (int K = 0; K < NK; ++K) {
-            for (int ILayer = 0; ILayer < NumLayers; ++ILayer) {
-               for (int IExch = 0; IExch < MyList->NList[ILayer]; ++IExch) {
-                  for (int J = 0; J < NJ; ++J) {
-                     I4 IBuff = (((M * NL + L) * NK + K) * MyList->NTot +
-                                 MyList->Offsets[ILayer] + IExch) *
-                                    NJ +
-                                J;
-                     Array(M, L, K, MyList->Ind[ILayer][IExch], J) =
-                         MyNeighbor->RecvBuffer[IBuff];
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   return 0;
-} // end unpackBuffer HostArray5DR8
-*/
 
 
 } // end namespace OMEGA
