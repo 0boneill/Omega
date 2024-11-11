@@ -118,10 +118,11 @@ HaloD::ExchListD::ExchListD(
    // Copy OffsetsH to device
    deepCopy(Offsets, OffsetsH);
 
+   // Allocate host and device arrays for storing lists of indices
    IndexH = HostArray1DI4("IndexH", NTot);
    Index = Array1DI4("Index", NTot);
 
-   // Copy List into member IndexH array on host which holds the indices
+   // Copy List into member IndexH array on host
    for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
       for (int IList = 0; IList < NHalo[IHalo]; ++IList) {
          IndexH(OffsetsH(IHalo) + IList) = List[IHalo][IList];
@@ -129,43 +130,6 @@ HaloD::ExchListD::ExchListD(
    }
    // Copy IndexH to device
    deepCopy(Index, IndexH);
-
-   // Set member vector sizes to number of halo layers
-//   NList.resize(HaloLayers);
-//   NLstH = HostArray1DI4("", HaloLayers);
-//   OffsH = HostArray1DI4("", HaloLayers);
-
-   // Copy List into member 2D vector Ind which holds the indices
-//   Ind = List;
-
-//   Idx.resize(HaloLayers);
-//   IdxH.resize(HaloLayers);
-//   Idx = List;
-
-   // Count the total number of elements in the list and set the
-   // number of elements in each halo layer
-//   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
-//      NList[IHalo] = List[IHalo].size();
-//      NList[IHalo] = NHalo[IHalo];
-//      IdxH[IHalo] = HostArray1DI4("", NList[IHalo]);
-//      for (int IList = 0; IList < NList[IHalo]; ++IList) {
-//         IdxH[IHalo](IList) = List[IHalo][IList];
-//      }
-//      parallelFor({NList[IHalo]}, KOKKOS_LAMBDA(int IList) {
-//         Idx[IHalo](IList) = List[IHalo][IList];
-//      });
-//      NLstH(IHalo) = List[IHalo].size();
-//      Idx[IHalo] = createDeviceMirrorCopy(IdxH[IHalo]);
-//   }
-
-   // Set the index offsets for each halo layer
-//   Offsets[0] = 0;
-////   OffsH(0) = 0;
-//   for (int I = 0; I < HaloLayers - 1; ++I) {
-//      Offsets[I + 1] = Offsets[I] + NList[I];
-//      OffsH(I + 1) = OffsH(I) + NLstH(I);
-//   }
-//   Offs = createDeviceMirrorCopy(OffsH);
 
 } // end ExchList constructor
 
@@ -227,11 +191,11 @@ HaloD::NeighborD::NeighborD(
    RecvLists[1] = ExchListD(RecvEdge);
    RecvLists[2] = ExchListD(RecvVrtx);
 
-   SendBuff = Array1DR8("SendBuff", 0);
-   RecvBuff = Array1DR8("RecvBuff", 0);
+   SendBuffer = Array1DR8("SendBuffer", 0);
+   RecvBuffer = Array1DR8("RecvBuffer", 0);
 
-   SendBuffH = HostArray1DR8("SendBuffH", 0);
-   RecvBuffH = HostArray1DR8("RecvBuffH", 0);
+   SendBufferH = HostArray1DR8("SendBufferH", 0);
+   RecvBufferH = HostArray1DR8("RecvBufferH", 0);
 
 } // end Neighbor constructor
 
@@ -2323,11 +2287,11 @@ int HaloD::startReceives(bool DeviceArray) {
          void* DataPtr{nullptr};
 
          if (DeviceArray && MpiOnDev) {
-            Kokkos::resize(LocNeighbor.RecvBuff, BufferSize);
-            DataPtr = LocNeighbor.RecvBuff.data();
+            Kokkos::resize(LocNeighbor.RecvBuffer, BufferSize);
+            DataPtr = LocNeighbor.RecvBuffer.data();
          } else {
-            Kokkos::resize(LocNeighbor.RecvBuffH, BufferSize);
-            DataPtr = LocNeighbor.RecvBuffH.data();
+            Kokkos::resize(LocNeighbor.RecvBufferH, BufferSize);
+            DataPtr = LocNeighbor.RecvBufferH.data();
          }
 
          IErr[INghbr] = MPI_Irecv(DataPtr, BufferSize,
@@ -2366,14 +2330,14 @@ int HaloD::startSends(const bool DeviceArray
 
          if (DeviceArray) {
             if (MpiOnDev) {
-               DataPtr = LocNeighbor.SendBuff.data();
+               DataPtr = LocNeighbor.SendBuffer.data();
             } else {
-               Kokkos::resize(LocNeighbor.SendBuffH, BufferSize);
-               deepCopy(LocNeighbor.SendBuffH, LocNeighbor.SendBuff);
-               DataPtr = LocNeighbor.SendBuffH.data();
+               Kokkos::resize(LocNeighbor.SendBufferH, BufferSize);
+               deepCopy(LocNeighbor.SendBufferH, LocNeighbor.SendBuffer);
+               DataPtr = LocNeighbor.SendBufferH.data();
             }
          } else {
-            DataPtr = LocNeighbor.SendBuffH.data();
+            DataPtr = LocNeighbor.SendBufferH.data();
          }
 
          MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
