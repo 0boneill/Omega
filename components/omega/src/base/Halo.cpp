@@ -6,7 +6,7 @@
 // and parallel decomposition (Decomp). These exchanges are carried out
 // via non-blocking MPI library routines. Constructor and private member
 // functions are defined here. The Halo class public member function
-// exchangeFullArrayHalo which is called by the user to perform halo
+// exchangeHalo which is called by the user to perform halo
 // exchanges on a given array is a template function and thus is defined
 // in the associated header file, Halo.h.
 //

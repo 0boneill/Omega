@@ -11,7 +11,7 @@
 /// object based on a given machine environment and parallel decomposition.
 /// The Halo object contains all the info needed for performing a halo
 /// exchange The halo exchanges are carried out via non-blocking MPI library
-/// routines. The Halo class public member function exchangeFullArrayHalo
+/// routines. The Halo class public member function exchangeHalo
 /// which is called by the user to perform halo exchanges is a template
 /// function and thus is fully defined in this header.
 ///
@@ -631,7 +631,7 @@ class HaloD {
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
 
-       if (devBufferPUP(Array)) {
+      if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuffer, LocList.NTot);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
@@ -650,24 +650,6 @@ class HaloD {
             LocBuffH(IExch) = RVal;
          }
       }
-
-//   Kokkos::fence();
-
-//   OMEGA_SCOPE(IDList, MyDecomp->CellIDH);
-//
-//   FILE *fptr;
-//   char filename[32];
-//   sprintf(filename, "out%d_%d.dat", MyTask, LocNeighbor.TaskID);
-//   fptr = fopen(filename, "w");
-//
-////   for (int I = 0; I < LocList.NTot; ++I) {
-//   for(int IHalo = 0; IHalo < NumLayers; ++IHalo) {
-//      for (int IList = 0; IList < LocList.NList[IHalo]; ++IList) {
-//         int IBuff = LocList.Offsets[IHalo] + IList;
-//      fprintf(fptr, "%8d %8d %8d %8d\n", IBuff, LocList.IndexH(IBuff), LocList.Ind[IHalo][IList], IDList(LocList.IndexH(IBuff)));
-//      }
-//   }
-//   fclose(fptr);
 
       return Err;
    }
@@ -726,8 +708,6 @@ class HaloD {
 
       const I4 NTotList = LocList.NTot;
 
-//      LocNeighbor.SendBuffer.resize(NTotList * TotSize);
-
       if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuffer, LocList.NTot * TotSize);
@@ -772,8 +752,6 @@ class HaloD {
       const I4 NL = Array.extent(0);
 
       const I4 NTotList = LocList.NTot;
-
-//      LocNeighbor.SendBuffer.resize(NTotList * TotSize);
 
       if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
@@ -824,8 +802,6 @@ class HaloD {
 
       const I4 NTotList = LocList.NTot;
 
-//      LocNeighbor.SendBuffer.resize(NTotList * TotSize);
-
       if (devBufferPUP(Array)) { 
          OMEGA_SCOPE(LocIndex, LocList.Index);
          Kokkos::resize(LocNeighbor.SendBuffer, LocList.NTot * TotSize);
@@ -862,9 +838,8 @@ class HaloD {
       return Err;
    }
 
-
-   /// Buffer unpack functions overloaded to each supported Kokkos array type.
-   /// After receiving a message from a neighboring task, save the elements
+   /// Buffer unpack function templates specified for supported Kokkos array
+   /// ranks. After receiving a message from a neighboring task, save the elements
    /// of RecvBuffer for that Neighbor into the corresponding halo elements
    /// of the input Array
 
@@ -897,28 +872,6 @@ class HaloD {
                reinterpret_cast<ValType &>(LocBuffH(IExch));
          }
       }
-
-//      Kokkos::fence();
-
-//   OMEGA_SCOPE(IDList, MyDecomp->CellIDH);
-//
-//   std::cout << "unpack " << MyTask << " " << LocNeighbor.TaskID << " " 
-//             << "NLayers " << NumLayers << "NList " << LocList.NList[0] << " " 
-//             <<LocList.NList[1] << " " << LocList.NList[2] << std::endl;
-//
-//   FILE *fptr;
-//   char filename[32];
-//   sprintf(filename, "unp%d_%d.dat", MyTask, LocNeighbor.TaskID);
-//   fptr = fopen(filename, "w");
-//
-//   //for (int I = 0; I < LocList.NTot; ++I) {
-//   for(int IHalo = 0; IHalo < NumLayers; ++IHalo) {
-//      for (int IList = 0; IList < LocList.NList[IHalo]; ++IList) {
-//         int IBuff = LocList.Offsets[IHalo] + IList;
-//      fprintf(fptr, "%8d %8d %8d %8d\n", IBuff, LocList.IndexH(IBuff), LocList.Ind[IHalo][IList], IDList(LocList.IndexH(IBuff)));
-//      }
-//   }
-//   fclose(fptr);
 
       return Err;
    }
@@ -1007,7 +960,6 @@ class HaloD {
 
       return Err;
    }
-
 
    template <typename T>
    typename std::enable_if<ArrayRank<T>::Is4D, int>::type
@@ -1152,8 +1104,8 @@ class HaloD {
    // array of any supported type defined on the input index space ThisElem
    template <typename T>
    int
-   exchangeFullArrayHalo(T &Array,            // Kokkos array of any type
-                         MeshElement ThisElem // index space Array is defined on
+   exchangeHalo(T &Array,            // Kokkos array of any type
+                MeshElement ThisElem // index space Array is defined on
    ) {
 
       I4 IErr{0}; // error code
@@ -1258,7 +1210,7 @@ class HaloD {
       }
 
       return IErr;
-   } // end exchangeFullArrayHalo
+   } // end exchangeHalo
 };
 } // end namespace OMEGA
 
