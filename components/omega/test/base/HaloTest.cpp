@@ -122,7 +122,7 @@ void haloExchangeTestD(
    }
 
    // Perform halo exchange
-   IErr = MyHalo->exchangeFullArrayHalo(TestArray, ThisElem);
+   IErr = MyHalo->exchangeHalo(TestArray, ThisElem);
    if (IErr != 0) {
       LOG_ERROR("HaloTest: Error during {} halo exchange", Label);
       LOG_INFO("HaloTest: {} exchange test FAIL", Label);
