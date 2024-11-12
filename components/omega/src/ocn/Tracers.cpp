@@ -26,7 +26,7 @@ std::map<std::string, I4> Tracers::TracerIndexes;
 std::map<I4, std::string> Tracers::TracerNames;
 std::vector<std::string> Tracers::TracerDimNames = {"NCells", "NVertLevels"};
 
-Halo *Tracers::MeshHalo = nullptr;
+HaloD *Tracers::MeshHalo = nullptr;
 
 I4 Tracers::NCellsOwned  = 0;
 I4 Tracers::NCellsAll    = 0;
@@ -53,7 +53,7 @@ I4 Tracers::init() {
    NCellsSize  = DefHorzMesh->NCellsSize;
    NVertLevels = DefHorzMesh->NVertLevels;
 
-   MeshHalo = Halo::getDefault();
+   MeshHalo = HaloD::getDefault();
 
    auto *DefTimeStepper = TimeStepper::getDefault();
    if (!DefTimeStepper) {
@@ -465,18 +465,18 @@ I4 Tracers::copyToHost(const I4 TimeLevel) {
 //---------------------------------------------------------------------------
 I4 Tracers::exchangeHalo(const I4 TimeLevel) {
    // TODO: copy only halo cells
-   copyToHost(TimeLevel);
+//   copyToHost(TimeLevel);
 
    I4 Err = 0;
    I4 TimeIndex;
 
    Err = getTimeIndex(TimeIndex, TimeLevel);
-   Err = MeshHalo->exchangeFullArrayHalo(TracerArraysH[TimeIndex], OnCell);
+   Err = MeshHalo->exchangeFullArrayHalo(TracerArrays[TimeIndex], OnCell);
    if (Err != 0)
       return -1;
 
    // TODO: copy only halo cells
-   copyToDevice(TimeLevel);
+//   copyToDevice(TimeLevel);
 
    return 0;
 }

@@ -94,7 +94,7 @@ int initState() {
 int createExactSolution(Real TimeEnd) {
    int Err = 0;
 
-   auto *DefHalo = Halo::getDefault();
+   auto *DefHalo = HaloD::getDefault();
    auto *DefMesh = HorzMesh::getDefault();
    Array3DReal TracerArray;
    Err = Tracers::getAll(TracerArray, 0);
@@ -180,7 +180,7 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing default decomposition");
    }
 
-   int HaloErr = Halo::init();
+   int HaloErr = HaloD::init();
    if (HaloErr != 0) {
       Err++;
       LOG_ERROR("TimeStepperTest: error initializing default halo");
@@ -221,7 +221,7 @@ int initTimeStepperTest(const std::string &mesh) {
    // level
 
    auto *DefMesh = HorzMesh::getDefault();
-   auto *DefHalo = Halo::getDefault();
+   auto *DefHalo = HaloD::getDefault();
 
    // Horz dimensions created in HorzMesh
    auto VertDim = Dimension::create("NVertLevels", NVertLevels);
@@ -307,7 +307,7 @@ void finalizeTimeStepperTest() {
    Dimension::clear();
    Field::clear();
    HorzMesh::clear();
-   Halo::clear();
+   HaloD::clear();
    Decomp::clear();
    MachEnv::removeAll();
 }
@@ -318,7 +318,7 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
 
    // Set pointers to data
    auto *DefMesh        = HorzMesh::getDefault();
-   auto *DefHalo        = Halo::getDefault();
+   auto *DefHalo        = HaloD::getDefault();
    auto *TestAuxState   = AuxiliaryState::get("TestAuxState");
    auto *TestTendencies = Tendencies::get("TestTendencies");
 

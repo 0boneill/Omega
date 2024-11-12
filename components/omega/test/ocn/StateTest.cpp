@@ -67,7 +67,7 @@ int initStateTest() {
       LOG_ERROR("State: error initializing default decomposition");
 
    // Initialize the default halo
-   Err = OMEGA::Halo::init();
+   Err = OMEGA::HaloD::init();
    if (Err != 0)
       LOG_ERROR("State: error initializing default halo");
 
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
 
       OMEGA::HorzMesh *DefHorzMesh = OMEGA::HorzMesh::getDefault();
       OMEGA::Decomp *DefDecomp     = OMEGA::Decomp::getDefault();
-      OMEGA::Halo *DefHalo         = OMEGA::Halo::getDefault();
+      OMEGA::HaloD *DefHalo         = OMEGA::HaloD::getDefault();
 
       // These hard-wired variables need to be upated
       // with retrivals/config options
@@ -334,6 +334,7 @@ int main(int argc, char *argv[]) {
       // Finalize Omega objects
       OMEGA::TimeStepper::clear();
       OMEGA::HorzMesh::clear();
+      OMEGA::HaloD::clear();
       OMEGA::Decomp::clear();
       OMEGA::MachEnv::removeAll();
       OMEGA::FieldGroup::clear();

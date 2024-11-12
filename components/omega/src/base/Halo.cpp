@@ -2340,7 +2340,7 @@ int HaloD::startSends(const bool DeviceArray
             DataPtr = LocNeighbor.SendBufferH.data();
          }
 
-         MPI_Isend(DataPtr, BufferSize, MPI_RealKind,
+         MPI_Isend(DataPtr, BufferSize, MPI_DOUBLE,
                    LocNeighbor.TaskID, 0, MyComm, &LocNeighbor.SReq);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} send to task {}", IErr[INghbr],

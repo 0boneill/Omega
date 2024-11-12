@@ -34,7 +34,7 @@ int OceanState::init() {
    // Retrieve the default decomposition and mesh
    Decomp *DefDecomp     = Decomp::getDefault();
    HorzMesh *DefHorzMesh = HorzMesh::getDefault();
-   Halo *DefHalo         = Halo::getDefault();
+   HaloD *DefHalo         = HaloD::getDefault();
 
    int NVertLevels = DefHorzMesh->NVertLevels;
 
@@ -64,7 +64,7 @@ int OceanState::init() {
 OceanState::OceanState(
     const std::string &Name_, //< [in] Name for new state
     HorzMesh *Mesh,           //< [in] HorzMesh for state
-    Halo *MeshHalo_,          //< [in] Halo for Mesh
+    HaloD *MeshHalo_,          //< [in] Halo for Mesh
     const int NVertLevels_,   //< [in] number of vertical levels
     const int NTimeLevels_    //< [in] number of time levels
 ) {
@@ -120,7 +120,7 @@ OceanState::OceanState(
 OceanState *
 OceanState::create(const std::string &Name, //< [in] Name for new state
                    HorzMesh *Mesh,          //< [in] HorzMesh for state
-                   Halo *MeshHalo,          //< [in] Halo for Mesh
+                   HaloD *MeshHalo,          //< [in] Halo for Mesh
                    const int NVertLevels,   //< [in] number of vertical levels
                    const int NTimeLevels    //< [in] number of time levels
 ) {
@@ -472,16 +472,16 @@ I4 OceanState::copyToHost(const I4 TimeLevel) {
 // TimeLevel == [1:new, 0:current, -1:previous, -2:two times ago, ...]
 I4 OceanState::exchangeHalo(const I4 TimeLevel) {
 
-   copyToHost(TimeLevel);
+//   copyToHost(TimeLevel);
 
    I4 Err = 0;
    I4 TimeIndex;
    Err = getTimeIndex(TimeIndex, TimeLevel);
 
-   MeshHalo->exchangeFullArrayHalo(LayerThicknessH[TimeIndex], OnCell);
-   MeshHalo->exchangeFullArrayHalo(NormalVelocityH[TimeIndex], OnEdge);
+   MeshHalo->exchangeFullArrayHalo(LayerThickness[TimeIndex], OnCell);
+   MeshHalo->exchangeFullArrayHalo(NormalVelocity[TimeIndex], OnEdge);
 
-   copyToDevice(TimeLevel);
+//   copyToDevice(TimeLevel);
 
    return 0;
 

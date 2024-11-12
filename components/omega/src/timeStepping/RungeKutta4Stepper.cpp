@@ -102,9 +102,9 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
          // TODO(mwarusz) this depends on halo width actually
          if (Stage == 2) {
             ProvisState->exchangeHalo(CurLevel);
-            auto ProvisTracersH = createHostMirrorCopy(ProvisTracers);
-            MeshHalo->exchangeFullArrayHalo(ProvisTracersH, OnCell);
-            deepCopy(ProvisTracers, ProvisTracersH);
+//            auto ProvisTracersH = createHostMirrorCopy(ProvisTracers);
+            MeshHalo->exchangeFullArrayHalo(ProvisTracers, OnCell);
+//            deepCopy(ProvisTracers, ProvisTracersH);
          }
 
          Tend->computeAllTendencies(ProvisState, AuxState, ProvisTracers,

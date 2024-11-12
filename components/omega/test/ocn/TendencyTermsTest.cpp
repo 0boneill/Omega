@@ -837,7 +837,7 @@ int initTendTest(const std::string &mesh) {
       LOG_ERROR("TendencyTermsTest: error initializing default decomposition");
    }
 
-   int HaloErr = Halo::init();
+   int HaloErr = HaloD::init();
    if (HaloErr != 0) {
       Err++;
       LOG_ERROR("TendencyTermsTest: error initializing default halo");
@@ -856,7 +856,7 @@ void finalizeTendTest() {
 
    HorzMesh::clear();
    Dimension::clear();
-   Halo::clear();
+   HaloD::clear();
    Decomp::clear();
    MachEnv::removeAll();
 

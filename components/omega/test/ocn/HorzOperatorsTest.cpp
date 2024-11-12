@@ -390,7 +390,7 @@ int initOperatorsTest(const std::string &MeshFile) {
       LOG_ERROR("OperatorsTest: error initializing default decomposition");
    }
 
-   int HaloErr = Halo::init();
+   int HaloErr = HaloD::init();
    if (HaloErr != 0) {
       Err++;
       LOG_ERROR("OperatorsTest: error initializing default halo");
@@ -408,7 +408,7 @@ int initOperatorsTest(const std::string &MeshFile) {
 void finalizeOperatorsTest() {
    HorzMesh::clear();
    Dimension::clear();
-   Halo::clear();
+   HaloD::clear();
    Decomp::clear();
    MachEnv::removeAll();
 }

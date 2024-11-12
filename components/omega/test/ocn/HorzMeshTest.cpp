@@ -59,7 +59,7 @@ int initHorzMeshTest() {
       LOG_ERROR("HorzMeshTest: error initializing default decomposition");
 
    // Initialize the default halo
-   Err = OMEGA::Halo::init();
+   Err = OMEGA::HaloD::init();
    if (Err != 0)
       LOG_ERROR("HorzMeshTest: error initializing default halo");
 
@@ -691,7 +691,7 @@ int main(int argc, char *argv[]) {
       // Perform halo exhange on owned cell only array and compare
       // read values
       // Tests that halo values are read in correctly
-      OMEGA::Halo *DefHalo = OMEGA::Halo::getDefault();
+      OMEGA::HaloD *DefHalo = OMEGA::HaloD::getDefault();
       OMEGA::HostArray1DR8 XCellTest("XCellTest", Mesh->NCellsSize);
       // Mesh->XCellH.deep_copy_to(XCellTest);
       OMEGA::deepCopy(XCellTest, Mesh->XCellH);
@@ -773,6 +773,7 @@ int main(int argc, char *argv[]) {
          LOG_INFO("HorzMeshTest: vertex halo exhange FAIL");
       }
       // Finalize Omega objects
+      OMEGA::HaloD::clear();
       OMEGA::HorzMesh::clear();
       OMEGA::Dimension::clear();
       OMEGA::Decomp::clear();

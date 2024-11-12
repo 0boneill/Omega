@@ -11,7 +11,7 @@
 /// object based on a given machine environment and parallel decomposition.
 /// The Halo object contains all the info needed for performing a halo
 /// exchange The halo exchanges are carried out via non-blocking MPI library
-/// routines. The Halo class public member function exchangeHalo
+/// routines. The Halo class public member function exchangeFullArrayHalo
 /// which is called by the user to perform halo exchanges is a template
 /// function and thus is fully defined in this header.
 ///
@@ -1104,7 +1104,7 @@ class HaloD {
    // array of any supported type defined on the input index space ThisElem
    template <typename T>
    int
-   exchangeHalo(T &Array,            // Kokkos array of any type
+   exchangeFullArrayHalo(T &Array,            // Kokkos array of any type
                 MeshElement ThisElem // index space Array is defined on
    ) {
 
@@ -1210,7 +1210,7 @@ class HaloD {
       }
 
       return IErr;
-   } // end exchangeHalo
+   } // end exchangeFullArrayHalo
 };
 } // end namespace OMEGA
 

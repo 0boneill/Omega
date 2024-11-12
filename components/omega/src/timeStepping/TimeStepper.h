@@ -72,7 +72,7 @@ class TimeStepper {
           Tendencies *InTend,             ///< [in] ptr to tendencies
           AuxiliaryState *InAuxState,     ///< [in] ptr to aux state variables
           HorzMesh *InMesh,               ///< [in] ptr to mesh information
-          Halo *InMeshHalo                ///< [in] ptr to halos
+          HaloD *InMeshHalo                ///< [in] ptr to halos
    );
 
    /// Create a time stepper when time information is needed before state
@@ -92,7 +92,7 @@ class TimeStepper {
        Tendencies *InTend,         ///< [in] ptr to tendencies
        AuxiliaryState *InAuxState, ///< [in] ptr to needed aux state variables
        HorzMesh *InMesh,           ///< [in] ptr to mesh information
-       Halo *InMeshHalo            ///< [in] ptr to halos
+       HaloD *InMeshHalo            ///< [in] ptr to halos
    );
 
    // Delete/destroy functions
@@ -239,7 +239,7 @@ class TimeStepper {
    Tendencies *Tend;         /// Ptr to tendency terms
    AuxiliaryState *AuxState; /// Ptr to auxiliary state data
    HorzMesh *Mesh;           /// Ptr to horizontal mesh info
-   Halo *MeshHalo;           /// Ptr to defined halos
+   HaloD *MeshHalo;           /// Ptr to defined halos
 
    /// Function for any method-specific modifications for the default stepper
    virtual void finalizeInit() {}

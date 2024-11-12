@@ -122,7 +122,7 @@ void haloExchangeTestD(
    }
 
    // Perform halo exchange
-   IErr = MyHalo->exchangeHalo(TestArray, ThisElem);
+   IErr = MyHalo->exchangeFullArrayHalo(TestArray, ThisElem);
    if (IErr != 0) {
       LOG_ERROR("HaloTest: Error during {} halo exchange", Label);
       LOG_INFO("HaloTest: {} exchange test FAIL", Label);
@@ -481,9 +481,9 @@ int main(int argc, char *argv[]) {
       deepCopy(Test1DR4D, Test1DR4);
       deepCopy(Test1DR8D, Test1DR8);
 
-      haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8", TotErr);
-      haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4", TotErr);
-      haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DI8, Test1DI8, "1DI8", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DR4, Test1DR4, "1DR4", TotErr);
+      haloExchangeTestD(DefHaloD, Init1DR8, Test1DR8, "1DR8", TotErr);
       haloExchangeTestD(DefHaloD, Init1DI8D, Test1DI8D, "1DI8D", TotErr);
       haloExchangeTestD(DefHaloD, Init1DR4D, Test1DR4D, "1DR4D", TotErr);
       haloExchangeTestD(DefHaloD, Init1DR8D, Test1DR8D, "1DR8D", TotErr);

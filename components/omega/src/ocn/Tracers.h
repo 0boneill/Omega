@@ -52,7 +52,7 @@ class Tracers {
    static std::map<I4, std::string> TracerNames;
 
    // for halo exchange
-   static Halo *MeshHalo;
+   static HaloD *MeshHalo;
 
    // Tracer dimension names
    static std::vector<std::string> TracerDimNames;

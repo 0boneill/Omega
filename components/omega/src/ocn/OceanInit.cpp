@@ -91,7 +91,7 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
-   Err = Halo::init();
+   Err = HaloD::init();
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing default halo");
       return Err;

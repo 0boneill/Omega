@@ -84,7 +84,7 @@ TimeStepper *TimeStepper::create(
     Tendencies *InTend,             ///< [in] ptr to tendencies
     AuxiliaryState *InAuxState,     ///< [in] ptr to aux state variables
     HorzMesh *InMesh,               ///< [in] ptr to mesh information
-    Halo *InMeshHalo                ///< [in] ptr to halos
+    HaloD *InMeshHalo                ///< [in] ptr to halos
 ) {
 
    // Check for duplicates
@@ -175,7 +175,7 @@ void TimeStepper::attachData(
     Tendencies *InTend,         // [in] ptr to tendencies (right hand side)
     AuxiliaryState *InAuxState, // [in] ptr to needed aux state variables
     HorzMesh *InMesh,           // [in] ptr to mesh information
-    Halo *InMeshHalo            // [in] ptr to halos
+    HaloD *InMeshHalo            // [in] ptr to halos
 ) {
 
    if (!InTend)
@@ -313,7 +313,7 @@ int TimeStepper::init2() {
 
    // Get default pointers
    HorzMesh *DefMesh        = HorzMesh::getDefault();
-   Halo *DefHalo            = Halo::getDefault();
+   HaloD *DefHalo            = HaloD::getDefault();
    Tendencies *DefTend      = Tendencies::getDefault();
    AuxiliaryState *AuxState = AuxiliaryState::getDefault();
 

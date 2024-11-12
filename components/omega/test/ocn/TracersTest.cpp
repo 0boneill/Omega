@@ -77,7 +77,7 @@ I4 initTracersTest() {
    }
 
    // Initialize the default halo
-   Err = Halo::init();
+   Err = HaloD::init();
    if (Err != 0) {
       LOG_ERROR("Tracers: error initializing default halo");
       return Err;
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 
       HorzMesh *DefHorzMesh       = HorzMesh::getDefault();
       Decomp *DefDecomp           = Decomp::getDefault();
-      Halo *DefHalo               = Halo::getDefault();
+      HaloD *DefHalo               = HaloD::getDefault();
       TimeStepper *DefTimeStepper = TimeStepper::getDefault();
 
       // initialize Tracers infrastructure
@@ -499,6 +499,7 @@ int main(int argc, char *argv[]) {
       Tracers::clear();
       TimeStepper::clear();
       HorzMesh::clear();
+      HaloD::clear();
       Decomp::clear();
       MachEnv::removeAll();
       FieldGroup::clear();

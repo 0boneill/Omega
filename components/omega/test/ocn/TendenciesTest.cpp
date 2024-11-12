@@ -118,7 +118,7 @@ int initTendenciesTest(const std::string &mesh) {
       LOG_ERROR("TendenciesTest: error initializing default decomposition");
    }
 
-   int HaloErr = Halo::init();
+   int HaloErr = HaloD::init();
    if (HaloErr != 0) {
       Err++;
       LOG_ERROR("TendenciesTest: error initializing default halo");
@@ -255,7 +255,7 @@ void finalizeTendenciesTest() {
    Dimension::clear();
    TimeStepper::clear();
    HorzMesh::clear();
-   Halo::clear();
+   HaloD::clear();
    Decomp::clear();
    MachEnv::removeAll();
 }

@@ -36,7 +36,7 @@ class OceanState {
 
    void defineFields();
 
-   Halo *MeshHalo;
+   HaloD *MeshHalo;
 
    static OceanState *DefaultOceanState;
 
@@ -45,7 +45,7 @@ class OceanState {
    /// Construct a new local state for a given decomposition
    OceanState(const std::string &Name, ///< [in] Name for mesh
               HorzMesh *Mesh,          ///< [in] Horizontal mesh
-              Halo *MeshHalo_,         ///< [in] Halo for Mesh
+              HaloD *MeshHalo_,         ///< [in] Halo for Mesh
               const int NVertLevels_,  ///< [in] Number of vertical levels
               const int NTimeLevels_   ///< [in] Number of time levels
    );
@@ -110,7 +110,7 @@ class OceanState {
    static OceanState *
    create(const std::string &Name, ///< [in] Name for mesh
           HorzMesh *Mesh,          ///< [in] Horizontal mesh
-          Halo *MeshHalo,          ///< [in] Halo for Mesh
+          HaloD *MeshHalo,          ///< [in] Halo for Mesh
           const int NVertLevels,   ///< [in] Number of vertical levels
           const int NTimeLevels    ///< [in] Number of time levels
    );
